@@ -46,6 +46,7 @@ linters:
     staticcheck:
       checks:
         - all
+        - ST1000
   exclusions:
     generated: lax
     presets:

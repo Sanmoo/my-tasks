@@ -1,4 +1,3 @@
-// Package cli provides...
 package cli
 
 import (
@@ -52,7 +51,6 @@ func newAddCmd() *cobra.Command {
 			fmt.Printf("Title: %s\n", task.Title)
 			fmt.Printf("Project: %s\n", task.Project)
 			fmt.Printf("Phase: %s\n", task.Phase)
-			fmt.Printf("Priority: %d\n", task.Priority)
 			if len(task.Tags) > 0 {
 				fmt.Printf("Tags: %s\n", strings.Join(task.Tags, ", "))
 			}

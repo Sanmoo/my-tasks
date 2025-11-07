@@ -23,6 +23,6 @@ type Repository interface {
 // Filter represents filtering options for listing tasks
 type Filter struct {
 	Status   *Status
-	Tags     []string
 	Priority *int
+	Tags     []string
 }

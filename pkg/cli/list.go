@@ -3,8 +3,10 @@ package cli
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
+	"github.com/Sanmoo/my-tasks/internal/app"
 	"github.com/Sanmoo/my-tasks/internal/task"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -18,10 +20,17 @@ func newListCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List all tasks",
-		Long:  "List all tasks with optional filtering by status, priority, or tags",
+		Use:   "list [project_name]",
+		Short: "List all tasks or tasks from a specific project",
+		Long:  "List all tasks with optional filtering by status, priority, or tags. If a project name is provided, lists only tasks from that project grouped by phase.",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Check if a project name was provided
+			if len(args) == 1 {
+				return listProjectTasks(args[0])
+			}
+
+			// Original list all tasks behavior
 			filter := task.Filter{}
 
 			if status != "" {
@@ -53,16 +62,6 @@ func newListCmd() *cobra.Command {
 			}
 
 			for _, t := range tasks {
-				priorityStr := fmt.Sprintf("%d", t.Priority)
-				switch {
-				case t.Priority >= 4:
-					priorityStr = pterm.Red(priorityStr)
-				case t.Priority == 3:
-					priorityStr = pterm.Yellow(priorityStr)
-				default:
-					priorityStr = pterm.Gray(priorityStr)
-				}
-
 				tagsStr := "-"
 				if len(t.Tags) > 0 {
 					tagsStr = strings.Join(t.Tags, " ")
@@ -78,14 +77,16 @@ func newListCmd() *cobra.Command {
 					shortID,
 					t.Project,
 					t.Phase,
-					priorityStr,
 					t.Title,
 					tagsStr,
 				})
 			}
 
 			// Render table
-			pterm.DefaultTable.WithHasHeader().WithData(tableData).Render()
+			err = pterm.DefaultTable.WithHasHeader().WithData(tableData).Render()
+			if err != nil {
+				return nil
+			}
 
 			return nil
 		},
@@ -96,4 +97,103 @@ func newListCmd() *cobra.Command {
 	cmd.Flags().StringSliceVarP(&tags, "tags", "t", []string{}, "Filter by tags (comma-separated)")
 
 	return cmd
+}
+
+// listProjectTasks lists all tasks from a specific project, grouped by phase
+func listProjectTasks(projectName string) error {
+	// Find the file containing this project
+	projectFile, err := App.GetProjectFile(projectName)
+	if err != nil {
+		return fmt.Errorf("failed to find project: %w", err)
+	}
+
+	// Create a new app instance with the project file
+	projectApp, err := app.NewWithProjectFile(projectFile)
+	if err != nil {
+		return fmt.Errorf("failed to load project: %w", err)
+	}
+
+	// Resolve project alias to full name
+	fullProjectName := projectApp.Config.ResolveProjectName(projectName)
+
+	// List all tasks from this project
+	tasks, err := projectApp.TaskService.ListTasks(context.Background(), task.Filter{})
+	if err != nil {
+		return fmt.Errorf("failed to list tasks: %w", err)
+	}
+
+	// Filter tasks by project and group by phase
+	tasksByPhase := make(map[string][]*task.Task)
+	for _, t := range tasks {
+		if t.Project == fullProjectName {
+			tasksByPhase[t.Phase] = append(tasksByPhase[t.Phase], t)
+		}
+	}
+
+	if len(tasksByPhase) == 0 {
+		pterm.Info.Printf("No tasks found in project '%s'\n", fullProjectName)
+		return nil
+	}
+
+	// Sort phases alphabetically
+	phases := make([]string, 0, len(tasksByPhase))
+	for phase := range tasksByPhase {
+		phases = append(phases, phase)
+	}
+	sort.Strings(phases)
+
+	// Display project header
+	pterm.DefaultHeader.WithFullWidth().
+		WithBackgroundStyle(pterm.NewStyle(pterm.BgLightBlue)).
+		WithTextStyle(pterm.NewStyle(pterm.FgBlack)).
+		Printf("Project: %s", fullProjectName)
+	fmt.Println()
+
+	// Display tasks grouped by phase
+	for _, phase := range phases {
+		phaseTasks := tasksByPhase[phase]
+
+		// Phase header
+		pterm.DefaultSection.Printf("Phase: %s (%d tasks)", phase, len(phaseTasks))
+
+		// Create table data for this phase
+		tableData := pterm.TableData{
+			{"ID", "Priority", "Title", "Status", "Tags"},
+		}
+
+		for _, t := range phaseTasks {
+			tagsStr := "-"
+			if len(t.Tags) > 0 {
+				tagsStr = strings.Join(t.Tags, " ")
+			}
+
+			// Truncate ID for display
+			shortID := t.ID
+			if len(shortID) > 8 {
+				shortID = shortID[:8]
+			}
+
+			statusStr := string(t.Status)
+			if t.Status == task.StatusCompleted {
+				statusStr = pterm.Green(statusStr)
+			}
+
+			tableData = append(tableData, []string{
+				shortID,
+				t.Title,
+				statusStr,
+				tagsStr,
+			})
+		}
+
+		// Render table
+		err = pterm.DefaultTable.WithHasHeader().WithData(tableData).Render()
+		if err != nil {
+			return err
+		}
+
+		fmt.Println()
+	}
+
+	return nil
 }

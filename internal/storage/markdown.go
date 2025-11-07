@@ -1,4 +1,3 @@
-// Package storage exposes ...
 package storage
 
 import (
@@ -198,13 +197,11 @@ func (s *MarkdownStorage) load() ([]*task.Task, error) {
 			}
 
 			currentTask = &task.Task{
-				ID:        uuid.New().String(),
-				Title:     title,
-				Project:   currentProject,
-				Phase:     currentPhase,
-				Status:    task.StatusPending,
-				CreatedAt: time.Now(),
-				Priority:  3,
+				ID:      uuid.New().String(),
+				Title:   title,
+				Project: currentProject,
+				Phase:   currentPhase,
+				Status:  task.StatusPending,
 			}
 			continue
 		}
@@ -371,7 +368,7 @@ func (s *MarkdownStorage) matchesFilter(t *task.Task, filter task.Filter) bool {
 		return false
 	}
 
-	if filter.Priority != nil && t.Priority != *filter.Priority {
+	if filter.Priority != nil {
 		return false
 	}
 

@@ -22,15 +22,13 @@ func NewService(repo Repository) *Service {
 // CreateTask creates a new task with validation
 func (s *Service) CreateTask(ctx context.Context, title, project, phase string, priority int, tags []string, comments []string) (*Task, error) {
 	task := &Task{
-		ID:        uuid.New().String(),
-		Title:     title,
-		Project:   project,
-		Phase:     phase,
-		Status:    StatusPending,
-		Priority:  priority,
-		CreatedAt: time.Now(),
-		Tags:      tags,
-		Comments:  comments,
+		ID:       uuid.New().String(),
+		Title:    title,
+		Project:  project,
+		Phase:    phase,
+		Status:   StatusPending,
+		Tags:     tags,
+		Comments: comments,
 	}
 
 	if err := task.Validate(); err != nil {
@@ -94,9 +92,6 @@ func (s *Service) UpdateTask(ctx context.Context, id, title, project, phase stri
 	}
 	if phase != "" {
 		task.Phase = phase
-	}
-	if priority > 0 {
-		task.Priority = priority
 	}
 	if tags != nil {
 		task.Tags = tags

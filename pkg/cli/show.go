@@ -32,8 +32,6 @@ func newShowCmd() *cobra.Command {
 				{"Project", t.Project},
 				{"Phase", t.Phase},
 				{"Status", string(t.Status)},
-				{"Priority", fmt.Sprintf("%d", t.Priority)},
-				{"Created", t.CreatedAt.Format("2006-01-02 15:04:05")},
 			}
 
 			if len(t.Tags) > 0 {
@@ -44,8 +42,8 @@ func newShowCmd() *cobra.Command {
 				details = append(details, []string{"Due Date", t.DueDate.Format("2006-01-02 15:04:05")})
 			}
 
-			if t.Status == task.StatusCompleted && t.CompletedAt != nil {
-				details = append(details, []string{"Completed", t.CompletedAt.Format("2006-01-02 15:04:05")})
+			if t.Status == task.StatusCompleted {
+				details = append(details, []string{"Completed"})
 			}
 
 			for _, detail := range details {

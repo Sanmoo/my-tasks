@@ -163,7 +163,7 @@ func (s *JSONStorage) matchesFilter(t *task.Task, filter task.Filter) bool {
 		return false
 	}
 
-	if filter.Priority != nil && t.Priority != *filter.Priority {
+	if filter.Priority != nil {
 		return false
 	}
 

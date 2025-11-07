@@ -1,3 +1,4 @@
+// Package cli provides...
 package cli
 
 import (

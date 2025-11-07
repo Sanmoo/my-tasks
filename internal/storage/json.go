@@ -21,7 +21,7 @@ func NewJSONStorage(filePath string) (*JSONStorage, error) {
 	// Create parent directory if it doesn't exist
 	dir := filepath.Dir(filePath)
 	if dir != "." && dir != "" {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return nil, err
 		}
 	}
@@ -154,7 +154,7 @@ func (s *JSONStorage) save(tasks map[string]*task.Task) error {
 		return err
 	}
 
-	return os.WriteFile(s.filepath, data, 0644)
+	return os.WriteFile(s.filepath, data, 0o600)
 }
 
 // matchesFilter checks if a task matches the given filter

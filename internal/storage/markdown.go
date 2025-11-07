@@ -1,3 +1,4 @@
+// Package storage exposes ...
 package storage
 
 import (
@@ -26,7 +27,7 @@ func NewMarkdownStorage(filePath string) (*MarkdownStorage, error) {
 	// Create parent directory if it doesn't exist
 	dir := filepath.Dir(filePath)
 	if dir != "." && dir != "" {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return nil, err
 		}
 	}
@@ -169,33 +170,33 @@ func (s *MarkdownStorage) load() ([]*task.Task, error) {
 	var currentPhase string
 	var currentTask *task.Task
 
-	scanner := bufio.Scanner(file)
+	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
 
 		// Project (# header)
-		if strings.HasPrefix(line, "# ") {
-			currentProject = strings.TrimPrefix(line, "# ")
+		if project, found := strings.CutPrefix(line, "# "); found {
+			currentProject = project
 			currentPhase = ""
 			currentTask = nil
 			continue
 		}
 
 		// Phase (## header)
-		if strings.HasPrefix(line, "## ") {
-			currentPhase = strings.TrimPrefix(line, "## ")
+		if phase, found := strings.CutPrefix(line, "## "); found {
+			currentPhase = phase
 			currentTask = nil
 			continue
 		}
 
 		// Task (bullet point starting with *)
-		if strings.HasPrefix(strings.TrimSpace(line), "* ") && !strings.HasPrefix(strings.TrimSpace(line), "  *") {
+		trimmedLine := strings.TrimSpace(line)
+		if title, found := strings.CutPrefix(trimmedLine, "* "); found && !strings.HasPrefix(trimmedLine, "  *") {
 			// Save previous task if any
 			if currentTask != nil {
 				tasks = append(tasks, currentTask)
 			}
 
-			title := strings.TrimPrefix(strings.TrimSpace(line), "* ")
 			currentTask = &task.Task{
 				ID:        uuid.New().String(),
 				Title:     title,
@@ -209,9 +210,10 @@ func (s *MarkdownStorage) load() ([]*task.Task, error) {
 		}
 
 		// Sub-bullet (directive or comment)
-		if currentTask != nil && strings.HasPrefix(strings.TrimSpace(line), "* ") {
-			subLine := strings.TrimPrefix(strings.TrimSpace(line), "* ")
-			s.parseSubBullet(currentTask, subLine)
+		if currentTask != nil {
+			if subLine, found := strings.CutPrefix(trimmedLine, "* "); found {
+				s.parseSubBullet(currentTask, subLine)
+			}
 		}
 	}
 
@@ -254,8 +256,7 @@ func (s *MarkdownStorage) parseSubBullet(t *task.Task, line string) {
 	}
 
 	// @tags directive
-	if strings.HasPrefix(line, "@tags ") {
-		tagsStr := strings.TrimPrefix(line, "@tags ")
+	if tagsStr, found := strings.CutPrefix(line, "@tags "); found {
 		tags := strings.Fields(tagsStr)
 		t.Tags = tags
 		return
@@ -317,7 +318,7 @@ func (s *MarkdownStorage) save(tasks []*task.Task) error {
 		}
 	}
 
-	return os.WriteFile(s.filepath, []byte(content.String()), 0644)
+	return os.WriteFile(s.filepath, []byte(content.String()), 0o600)
 }
 
 // writeTask writes a single task to the content builder

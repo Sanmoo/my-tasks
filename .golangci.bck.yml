@@ -1,0 +1,81 @@
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck      # Check for unchecked errors
+    - gosimple      # Simplify code
+    - govet         # Vet examines Go source code
+    - ineffassign   # Detect ineffectual assignments
+    - staticcheck   # Advanced Go linter
+    - unused        # Check for unused code
+    - gofmt         # Check formatting
+    - goimports     # Check import formatting
+    - misspell      # Check for misspelled words
+    - gocritic      # Advanced linter with many checks
+    - revive        # Fast, configurable, extensible linter
+    - stylecheck    # Style checker
+    - gosec         # Security checks
+    - bodyclose     # Check for unclosed HTTP response bodies
+    - unconvert     # Remove unnecessary type conversions
+    - unparam       # Check for unused function parameters
+    - prealloc      # Find slice declarations that could be preallocated
+    - predeclared   # Find code that shadows predeclared identifiers
+    - nolintlint    # Check nolint directives
+    - exportloopref # Check for pointer references to loop variables
+    - errname       # Check error naming
+    - errorlint     # Error wrapping checks
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+  govet:
+    enable-all: true
+
+  gofmt:
+    simplify: true
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+      - experimental
+      - opinionated
+
+  revive:
+    rules:
+      - name: exported
+        severity: warning
+      - name: indent-error-flow
+        severity: warning
+      - name: var-naming
+        severity: warning
+      - name: package-comments
+        severity: warning
+
+  stylecheck:
+    checks: ["all"]
+
+  gosec:
+    severity: medium
+    confidence: medium
+
+issues:
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - gosec
+        - errcheck
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  print-issued-lines: true
+  print-linter-name: true

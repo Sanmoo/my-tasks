@@ -1,0 +1,9 @@
+{
+  // MD013: Line length
+  "MD013": {
+    "line_length": 160, // Set your desired max width here
+    "code_blocks": false, // Optional: exempt code blocks from this rule
+    "tables": false // Optional: exempt tables from this rule
+  }
+}
+

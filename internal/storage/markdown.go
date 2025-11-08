@@ -44,16 +44,25 @@ func (s *MarkdownStorage) GetProject(ctx context.Context, nameOrAlias string) (*
 		}
 	}
 
-	project, err := s.load(name)
+	projects, err := s.load(&name)
 	if err != nil {
 		return nil, err
 	}
 
-	return project, nil
+	if len(projects) == 0 {
+		return nil, fmt.Errorf("project with name %s could not be found", name)
+	}
+
+	return projects[0], nil
 }
 
-// load reads tasks from the markdown file
-func (s *MarkdownStorage) load(projectName string) (*task.Project, error) {
+func (s *MarkdownStorage) GetAllProjects(ctx context.Context) ([]*task.Project, error) {
+	return s.load(nil)
+}
+
+func (s *MarkdownStorage) load(projectName *string) ([]*task.Project, error) {
+	result := []*task.Project{}
+
 	for _, fp := range s.filepaths {
 		file, err := os.Open(fp)
 		if err != nil {
@@ -77,11 +86,12 @@ func (s *MarkdownStorage) load(projectName string) (*task.Project, error) {
 
 			// Project (# header)
 			if project, found := strings.CutPrefix(line, "# "); found {
-				if currentProject != nil && currentProject.GetName() == projectName {
-					return currentProject, nil
+				if currentProject != nil && projectName != nil && currentProject.GetName() == *projectName {
+					return []*task.Project{currentProject}, nil
 				}
 				project = strings.TrimSpace(project)
 				currentProject, err = task.NewProject(project)
+				result = append(result, currentProject)
 				if err != nil {
 					return nil, err
 				}
@@ -90,7 +100,7 @@ func (s *MarkdownStorage) load(projectName string) (*task.Project, error) {
 				continue
 			}
 
-			if currentProject != nil && currentProject.GetName() != projectName {
+			if currentProject != nil && projectName != nil && currentProject.GetName() != *projectName {
 				// we are not looking for data of this project, so
 				continue
 			}
@@ -145,14 +155,14 @@ func (s *MarkdownStorage) load(projectName string) (*task.Project, error) {
 			return nil, err
 		}
 
-		if currentProject != nil && currentProject.GetName() == projectName {
-			return currentProject, nil
+		if currentProject != nil && projectName != nil && currentProject.GetName() == *projectName {
+			return []*task.Project{currentProject}, nil
 		}
 
 		file.Close()
 	}
 
-	return nil, fmt.Errorf("no project named '%s' could be found in the configured file paths", projectName)
+	return result, nil
 }
 
 // parseSubBullet parses a sub-bullet line and updates the task
@@ -171,6 +181,7 @@ func (s *MarkdownStorage) parseSubBullet(t *task.Task, line subbulletLine) error
 		}
 
 		t.AddReminder(&task.Reminder{
+			Label:        line.line,
 			Time:         date,
 			Acknowledged: false,
 		})
@@ -192,6 +203,7 @@ func (s *MarkdownStorage) parseSubBullet(t *task.Task, line subbulletLine) error
 		}
 
 		t.AddReminder(&task.Reminder{
+			Label:        line.line,
 			Time:         date,
 			Acknowledged: true,
 		})

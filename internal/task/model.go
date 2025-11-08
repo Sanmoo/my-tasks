@@ -34,7 +34,7 @@ func (p *Project) GetName() string {
 type Phase struct {
 	name             string
 	associatedStatus Status
-	tasks            []Task
+	tasks            []*Task
 }
 
 func (ph *Phase) GetName() string {
@@ -46,12 +46,14 @@ type Task struct {
 	title     string
 	comments  []string
 	tags      []string
-	reminders []Reminder
+	reminders []*Reminder
 }
 
 // Reminder represents a task Reminder
 type Reminder struct {
+	Label        string
 	Time         time.Time
+	TaskTitle    string
 	Acknowledged bool
 }
 
@@ -114,7 +116,7 @@ func (task *Task) AddComment(comment string) error {
 }
 
 func (task *Task) AddReminder(reminder *Reminder) {
-	task.reminders = append(task.reminders, *reminder)
+	task.reminders = append(task.reminders, reminder)
 }
 
 func (task *Task) SetDueDate(dueDate *time.Time) error {
@@ -136,7 +138,7 @@ func (task *Task) AddTag(tag string) error {
 }
 
 func (ph *Phase) AddTask(task *Task) {
-	ph.tasks = append(ph.tasks, *task)
+	ph.tasks = append(ph.tasks, task)
 }
 
 func (p *Project) GetPhaseByName(name string) (*Phase, error) {
@@ -149,7 +151,7 @@ func (p *Project) GetPhaseByName(name string) (*Phase, error) {
 	return nil, fmt.Errorf("phase %s not found in project with name %s", name, p.name)
 }
 
-func (ph *Phase) GetTasks() []Task {
+func (ph *Phase) GetTasks() []*Task {
 	return ph.tasks
 }
 
@@ -167,4 +169,37 @@ func (task *Task) GetTags() []string {
 
 func (task *Task) GetTitle() string {
 	return task.title
+}
+
+func (task *Task) GetOverdueReminders() []*Reminder {
+	result := []*Reminder{}
+
+	for _, rem := range task.reminders {
+		if !rem.Acknowledged && rem.Time.Before(time.Now()) {
+			rem.TaskTitle = task.title
+			result = append(result, rem)
+		}
+	}
+
+	return result
+}
+
+func (ph *Phase) GetOverdueReminders() []*Reminder {
+	result := []*Reminder{}
+
+	for _, task := range ph.GetTasks() {
+		result = append(result, task.GetOverdueReminders()...)
+	}
+
+	return result
+}
+
+func (p *Project) GetOverdueReminders() []*Reminder {
+	result := []*Reminder{}
+
+	for _, phase := range p.GetPhases() {
+		result = append(result, phase.GetOverdueReminders()...)
+	}
+
+	return result
 }

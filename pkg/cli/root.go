@@ -31,6 +31,7 @@ func NewRootCmd() *cobra.Command {
 	// Add subcommands
 	rootCmd.AddCommand(
 		newListCmd(),
+		newRemindCmd(),
 	)
 
 	return rootCmd

@@ -20,17 +20,15 @@ func newRemindCmd() *cobra.Command {
 				return err
 			}
 
-			viewReminders := []views.Reminder{}
+			reminderPanel := views.NewReminderPanel()
 			for _, p := range projects {
 				for _, rem := range p.GetOverdueReminders() {
-					viewReminders = append(viewReminders, views.Reminder{
+					reminderPanel.AddReminder(views.Reminder{
 						Project: p.GetName(),
-						Label:   fmt.Sprintf("Task: %s. Reminder: %s.", rem.TaskTitle, rem.Label),
+						Label:   fmt.Sprintf("%s: %s.", rem.Label, rem.TaskTitle),
 					})
 				}
 			}
-
-			reminderPanel := views.ReminderPanel{Reminders: viewReminders}
 
 			reminderPanel.Render()
 

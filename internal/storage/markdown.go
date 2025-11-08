@@ -109,7 +109,7 @@ func (s *MarkdownStorage) load(projectName *string) ([]*task.Project, error) {
 
 			// Phase (## header)
 			if phase, found := strings.CutPrefix(line, "## "); found {
-				currentPhase, err = task.NewPhase(phase)
+				currentPhase, err = task.NewPhase(phase, currentProject.GetName())
 				if err != nil {
 					return nil, err
 				}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Sanmoo/my-tasks/internal/task"
 	"github.com/Sanmoo/my-tasks/pkg/views"
 	"github.com/spf13/cobra"
 )
@@ -37,6 +38,8 @@ func newListCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("failed to find projects with name %s: %w", projectNameOrAlias, err)
 			}
+
+			RenderWarningsIfAny([]*task.Project{project})
 
 			columns := []views.Column{}
 

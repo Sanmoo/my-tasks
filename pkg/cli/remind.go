@@ -20,6 +20,8 @@ func newRemindCmd() *cobra.Command {
 				return err
 			}
 
+			RenderWarningsIfAny(projects)
+
 			reminderPanel := views.NewReminderPanel()
 			for _, p := range projects {
 				for _, rem := range p.GetOverdueReminders() {

@@ -34,6 +34,7 @@ func (p *Project) GetName() string {
 type Phase struct {
 	name             string
 	associatedStatus Status
+	projectName      string
 	tasks            []*Task
 }
 
@@ -73,7 +74,7 @@ func (p *Project) AddPhase(ph *Phase) {
 	p.phases = append(p.phases, ph)
 }
 
-func NewPhase(name string) (*Phase, error) {
+func NewPhase(name, projectName string) (*Phase, error) {
 	if name == "" {
 		return nil, errors.New("a project Name must not be empty")
 	}
@@ -93,6 +94,7 @@ func NewPhase(name string) (*Phase, error) {
 	return &Phase{
 		name:             name,
 		associatedStatus: associatedStatus,
+		projectName:      projectName,
 	}, nil
 }
 
@@ -194,11 +196,55 @@ func (ph *Phase) GetOverdueReminders() []*Reminder {
 	return result
 }
 
+func (p *Project) GetWarnings() []string {
+	result := []string{}
+
+	for _, ph := range p.GetPhases() {
+		result = append(result, ph.GetWarnings()...)
+	}
+
+	return result
+}
+
+func (ph *Phase) GetWarnings() []string {
+	result := []string{}
+
+	if ph.associatedStatus == StatusScheduled {
+		for _, task := range ph.tasks {
+			if len(task.GetActiveReminders()) == 0 {
+				result = append(
+					result,
+					fmt.Sprintf(
+						"This task [%s] - %s is in phase %s, which is of kind 'scheduled', however it has no reminders active",
+						ph.projectName,
+						task.title,
+						ph.name,
+					),
+				)
+			}
+		}
+	}
+
+	return result
+}
+
 func (p *Project) GetOverdueReminders() []*Reminder {
 	result := []*Reminder{}
 
 	for _, phase := range p.GetPhases() {
 		result = append(result, phase.GetOverdueReminders()...)
+	}
+
+	return result
+}
+
+func (task *Task) GetActiveReminders() []*Reminder {
+	result := []*Reminder{}
+
+	for _, rem := range task.reminders {
+		if !rem.Acknowledged {
+			result = append(result, rem)
+		}
 	}
 
 	return result

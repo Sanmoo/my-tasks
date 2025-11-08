@@ -20,15 +20,17 @@ type subbulletLine struct {
 }
 
 type MarkdownStorage struct {
-	projectAliases map[string]string
-	filepaths      []string
+	projectAliases  map[string]string
+	defaultTimezone string
+	filepaths       []string
 }
 
 // NewMarkdownStorage creates a new markdown storage
-func NewMarkdownStorage(filePaths []string, projectAliases map[string]string) (*MarkdownStorage, error) {
+func NewMarkdownStorage(filePaths []string, projectAliases map[string]string, defaultTimezone string) (*MarkdownStorage, error) {
 	storage := &MarkdownStorage{
-		filepaths:      filePaths,
-		projectAliases: projectAliases,
+		filepaths:       filePaths,
+		projectAliases:  projectAliases,
+		defaultTimezone: defaultTimezone,
 	}
 
 	return storage, nil
@@ -170,7 +172,7 @@ func (s *MarkdownStorage) parseSubBullet(t *task.Task, line subbulletLine) error
 	// @remind directive
 	if strings.HasPrefix(line.line, "@remind") && !strings.HasPrefix(line.line, "@reminded") {
 		dateStr := extractDateFromParenthesis(line.line)
-		date, err := parseDate(dateStr)
+		date, err := parseDate(dateStr + " " + s.defaultTimezone)
 		if err != nil {
 			return fmt.Errorf(
 				"error found in file %s, project %s: remider declared at line %d has not a parseable date, please check",
@@ -192,7 +194,7 @@ func (s *MarkdownStorage) parseSubBullet(t *task.Task, line subbulletLine) error
 	// @reminded directive
 	if strings.HasPrefix(line.line, "@reminded") {
 		dateStr := extractDateFromParenthesis(line.line)
-		date, err := parseDate(dateStr)
+		date, err := parseDate(dateStr + " " + s.defaultTimezone)
 		if err != nil {
 			return fmt.Errorf(
 				"error found in file %s, project %s: remider declared at line %d has not a parseable date, please check",
@@ -223,7 +225,7 @@ func (s *MarkdownStorage) parseSubBullet(t *task.Task, line subbulletLine) error
 	// @due directive
 	if strings.HasPrefix(line.line, "@due ") {
 		dateStr := extractDateFromParenthesis(line.line)
-		date, err := parseDate(dateStr)
+		date, err := parseDate(dateStr + " " + s.defaultTimezone)
 		if err != nil {
 			return fmt.Errorf(
 				"error found in file %s, project %s: due directive declared at line %d has not a parseable date, please check",
@@ -258,17 +260,17 @@ func extractDateFromParenthesis(line string) string {
 // parseDate parses date from various formats
 func parseDate(dateStr string) (time.Time, error) {
 	// Try format: YY-MM-DD HH:MM:SS
-	if t, err := time.Parse("06-01-02 15:04:05", dateStr); err == nil {
+	if t, err := time.Parse("06-01-02 15:04:05 MST", dateStr); err == nil {
 		return t, nil
 	}
 
 	// Try format: YY-MM-DD HH:MM
-	if t, err := time.Parse("06-01-02 15:04", dateStr); err == nil {
+	if t, err := time.Parse("06-01-02 15:04 MST", dateStr); err == nil {
 		return t, nil
 	}
 
 	// Try format: YY-MM-DD
-	if t, err := time.Parse("06-01-02", dateStr); err == nil {
+	if t, err := time.Parse("06-01-02 MST", dateStr); err == nil {
 		return t, nil
 	}
 

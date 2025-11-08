@@ -18,17 +18,18 @@ type App struct {
 
 // Config holds application configuration
 type Config struct {
-	ProjectAliases map[string]string // Maps alias to full project name
-	DefaultProject string
-	ProjectFiles   []string // List of markdown files to search for projects
+	ProjectAliases  map[string]string // Maps alias to full project name
+	DefaultProject  string
+	DefaultTimezone string
+	ProjectFiles    []string // List of markdown files to search for projects
 }
 
 // YAMLConfig represents the structure of the YAML configuration file
 type YAMLConfig struct {
 	Project struct {
-		Aliases map[string]string `yaml:"aliases"`
-		Default string            `yaml:"default"`
-		Files   []string          `yaml:"files"`
+		Aliases  map[string]string `yaml:"aliases"`
+		Defaults map[string]string `yaml:"defaults"`
+		Files    []string          `yaml:"files"`
 	} `yaml:"project"`
 }
 
@@ -43,6 +44,7 @@ func New() (*App, error) {
 	repo, err := storage.NewMarkdownStorage(
 		config.ProjectFiles,
 		config.ProjectAliases,
+		config.DefaultTimezone,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize storage: %w", err)
@@ -81,9 +83,10 @@ func loadConfig() (*Config, error) {
 	}
 
 	return &Config{
-		ProjectAliases: projectAliases,
-		ProjectFiles:   projectFiles,
-		DefaultProject: yamlConfig.Project.Default,
+		ProjectAliases:  projectAliases,
+		ProjectFiles:    projectFiles,
+		DefaultProject:  yamlConfig.Project.Defaults["project"],
+		DefaultTimezone: yamlConfig.Project.Defaults["timezone"],
 	}, nil
 }
 
@@ -118,7 +121,7 @@ func NewApp() (*App, error) {
 	}
 
 	// Initialize storage with the specified project file
-	repo, err := storage.NewMarkdownStorage(config.ProjectFiles, config.ProjectAliases)
+	repo, err := storage.NewMarkdownStorage(config.ProjectFiles, config.ProjectAliases, config.DefaultTimezone)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize storage: %w", err)
 	}

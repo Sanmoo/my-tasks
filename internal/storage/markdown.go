@@ -168,7 +168,7 @@ func (s *MarkdownStorage) load(projectName *string) ([]*task.Project, error) {
 // parseSubBullet parses a sub-bullet line and updates the task
 func (s *MarkdownStorage) parseSubBullet(t *task.Task, line subbulletLine) error {
 	// @remind directive
-	if strings.HasPrefix(line.line, "@remind") {
+	if strings.HasPrefix(line.line, "@remind") && !strings.HasPrefix(line.line, "@reminded") {
 		dateStr := extractDateFromParenthesis(line.line)
 		date, err := parseDate(dateStr)
 		if err != nil {

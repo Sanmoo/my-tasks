@@ -2,6 +2,7 @@
 
 ## To Do
 
+* Bug: comando remind está trazendo reminders já marcados como visto
 * Bug: visualização do comando list está toda zuada. Simplificar exibindo no modo listagem simplificada.
 * Configurar timezone default dos horários das tarefas
 * Alertar quando tiver itens em fases agendadas sem um reminder ativo

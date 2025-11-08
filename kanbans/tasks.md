@@ -2,10 +2,12 @@
 
 ## To Do
 
-## 🏃 Doing
+* Configurar timezone default dos horários das tarefas
+* Alertar quando tiver itens em fases agendadas sem um reminder ativo
+* Incrementar funcionalidade do comando list para aceitar mais de um projeto
+* Incrementar funcionalidade do comando list para filtrar por tipos de estágio e por reminders que estão overdue
 
-* Creation of `remiders` command and activate it by default
-  * @remind (20-01-01 01:00) Check something
+## 🏃 Doing
 
 ## ✅ Done
 
@@ -27,3 +29,5 @@
   * Testing
 * Support the command `tasks <project_name> list`
   * Should list all tasks from `<project_name>`, segregated by Phase / section.
+* Creation of `remiders` command and activate it by default
+  * @remind (20-01-01 01:00) Check something

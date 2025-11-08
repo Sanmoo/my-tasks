@@ -19,13 +19,15 @@ type App struct {
 // Config holds application configuration
 type Config struct {
 	ProjectAliases map[string]string // Maps alias to full project name
-	ProjectFiles   []string          // List of markdown files to search for projects
+	DefaultProject string
+	ProjectFiles   []string // List of markdown files to search for projects
 }
 
 // YAMLConfig represents the structure of the YAML configuration file
 type YAMLConfig struct {
 	Project struct {
 		Aliases map[string]string `yaml:"aliases"`
+		Default string            `yaml:"default"`
 		Files   []string          `yaml:"files"`
 	} `yaml:"project"`
 }
@@ -81,6 +83,7 @@ func loadConfig() (*Config, error) {
 	return &Config{
 		ProjectAliases: projectAliases,
 		ProjectFiles:   projectFiles,
+		DefaultProject: yamlConfig.Project.Default,
 	}, nil
 }
 

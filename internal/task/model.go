@@ -6,8 +6,6 @@ import (
 	"slices"
 	"strings"
 	"time"
-
-	"github.com/zyedidia/generic/list"
 )
 
 // Status represents the status of a task
@@ -22,11 +20,11 @@ const (
 
 type Project struct {
 	name   string
-	phases []Phase
+	phases []*Phase
 }
 
-func (p *Project) GetPhases() *[]Phase {
-	return &p.phases
+func (p *Project) GetPhases() []*Phase {
+	return p.phases
 }
 
 func (p *Project) GetName() string {
@@ -35,8 +33,8 @@ func (p *Project) GetName() string {
 
 type Phase struct {
 	name             string
-	tasks            list.List[Task]
 	associatedStatus Status
+	tasks            []Task
 }
 
 func (ph *Phase) GetName() string {
@@ -65,12 +63,12 @@ func NewProject(name string) (*Project, error) {
 	// At least a Phase for pending and another one for concluded
 	return &Project{
 		name:   name,
-		phases: []Phase{},
+		phases: []*Phase{},
 	}, nil
 }
 
 func (p *Project) AddPhase(ph *Phase) {
-	p.phases = append(p.phases, *ph)
+	p.phases = append(p.phases, ph)
 }
 
 func NewPhase(name string) (*Phase, error) {
@@ -138,27 +136,27 @@ func (task *Task) AddTag(tag string) error {
 }
 
 func (ph *Phase) AddTask(task *Task) {
-	ph.tasks.PushBack(*task)
+	ph.tasks = append(ph.tasks, *task)
 }
 
 func (p *Project) GetPhaseByName(name string) (*Phase, error) {
 	for _, phase := range p.phases {
 		if phase.name == name {
-			return &phase, nil
+			return phase, nil
 		}
 	}
 
 	return nil, fmt.Errorf("phase %s not found in project with name %s", name, p.name)
 }
 
-func (ph *Phase) GetTasks() list.List[Task] {
+func (ph *Phase) GetTasks() []Task {
 	return ph.tasks
 }
 
 func (ph *Phase) GetTaskTitles() []string {
 	result := []string{}
-	for node := ph.GetTasks().Front; node != nil; node = node.Next {
-		result = append(result, node.Value.title)
+	for _, task := range ph.GetTasks() {
+		result = append(result, task.GetTitle())
 	}
 	return result
 }

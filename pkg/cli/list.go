@@ -22,28 +22,33 @@ func newListCmd() *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Check if a project name was provided
+			var projectNameOrAlias string
+
 			if len(args) == 0 {
-				return fmt.Errorf("a project name or alias must be provided")
+				projectNameOrAlias = App.Config.DefaultProject
+				if projectNameOrAlias == "" {
+					return fmt.Errorf("a project name or alias must be provided or a default one must be configured")
+				}
+			} else {
+				projectNameOrAlias = args[0]
 			}
 
-			project, err := App.TaskService.GetProjectByNameOrAlias(context.Background(), args[0])
+			project, err := App.TaskService.GetProjectByNameOrAlias(context.Background(), projectNameOrAlias)
 			if err != nil {
-				return fmt.Errorf("failed to find projects with name %s: %w", args[0], err)
+				return fmt.Errorf("failed to find projects with name %s: %w", projectNameOrAlias, err)
 			}
 
 			columns := []views.Column{}
 
-			for _, p := range *project.GetPhases() {
-				for currentNode, i := p.GetTasks().Front, 1; currentNode != nil; currentNode, i = currentNode.Next, i+1 {
-					columns = append(columns, views.Column{
-						Name:  p.GetName(),
-						Tasks: p.GetTaskTitles(),
-					})
-				}
+			for _, p := range project.GetPhases() {
+				columns = append(columns, views.Column{
+					Name:  p.GetName(),
+					Tasks: p.GetTaskTitles(),
+				})
 			}
 
 			kanban := views.Kanban{
-				ProjectName: args[0],
+				ProjectName: projectNameOrAlias,
 				Columns:     columns,
 			}
 

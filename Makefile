@@ -35,7 +35,7 @@ install: build
 
 # Run the application
 run: build
-	@./bin/tasks
+	@./bin/tasks $(ARGS)
 
 # Display help
 help:

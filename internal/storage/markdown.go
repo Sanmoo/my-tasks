@@ -119,6 +119,7 @@ func (s *MarkdownStorage) load(projectName string) (*task.Project, error) {
 					return nil, fmt.Errorf("error found in file %s: found a invalid task declaration at line %d (title %s). all tasks should be declared under a phase", fp, currentLineNumber, title)
 				}
 				currentPhase.AddTask(currentTask)
+
 				continue
 			}
 
@@ -138,8 +139,6 @@ func (s *MarkdownStorage) load(projectName string) (*task.Project, error) {
 				}
 				continue
 			}
-
-			return nil, fmt.Errorf("error found in file %s: found a invalid declaration at line %d (line \"%s\"). all lines should be either empty, a project declaration, a phase declaration under a project, a task declaration under a phase, a directive or comment declared under a task", fp, currentLineNumber, line)
 		}
 
 		if err := scanner.Err(); err != nil {

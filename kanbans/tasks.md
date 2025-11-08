@@ -5,7 +5,7 @@
 * Support the command `tasks <project_name> list`
   * Should list all tasks from `<project_name>`, segregated by Phase / section.
 
-## Doing
+## 🏃 Doing
 
 * Support `yaml` configuration file (loaded in `~/.config/tasks/tasks.conf.yaml`)
   * Should support properties like:
@@ -24,4 +24,4 @@
     `project.files` define a list of paths to files that the app can use to find the data
   * Testing
 
-## Done
+## ✅ Done

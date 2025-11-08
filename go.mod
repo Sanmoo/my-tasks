@@ -3,9 +3,10 @@ module github.com/Sanmoo/my-tasks
 go 1.21
 
 require (
-	github.com/google/uuid v1.6.0
 	github.com/pterm/pterm v0.12.79
 	github.com/spf13/cobra v1.8.0
+	github.com/zyedidia/generic v1.2.2-0.20230819223407-98022f93823f
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -23,5 +24,4 @@ require (
 	golang.org/x/sys v0.16.0 // indirect
 	golang.org/x/term v0.16.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

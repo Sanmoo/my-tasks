@@ -16,8 +16,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "tasks",
 		Short: "A simple and powerful CLI task manager",
-		Long: `Tasks is a CLI application for managing your tasks efficiently.
-It supports creating, listing, completing, and organizing tasks with priorities and tags.`,
+		Long:  "A task manager CLI tailored to my own needs",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// Initialize app for all commands
 			var err error
@@ -31,13 +30,7 @@ It supports creating, listing, completing, and organizing tasks with priorities 
 
 	// Add subcommands
 	rootCmd.AddCommand(
-		newAddCmd(),
 		newListCmd(),
-		newCompleteCmd(),
-		newReopenCmd(),
-		newDeleteCmd(),
-		newUpdateCmd(),
-		newShowCmd(),
 	)
 
 	return rootCmd

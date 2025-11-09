@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/Sanmoo/my-tasks/pkg/views"
@@ -10,10 +11,7 @@ import (
 )
 
 func newListCmd() *cobra.Command {
-	var (
-		status string
-		tags   []string
-	)
+	var statuses []string
 
 	cmd := &cobra.Command{
 		Use:   "list [project_names]",
@@ -40,14 +38,16 @@ func newListCmd() *cobra.Command {
 
 			RenderWarningsIfAny(projects)
 
-			columns := []views.Column{}
-
 			for _, project := range projects {
+				columns := []views.Column{}
+
 				for _, p := range project.GetPhases() {
-					columns = append(columns, views.Column{
-						Name:  p.GetName(),
-						Tasks: p.GetTaskTitles(),
-					})
+					if len(statuses) == 0 || slices.Contains(statuses, string(p.GetAssociatedStatus())) {
+						columns = append(columns, views.Column{
+							Name:  p.GetName(),
+							Tasks: p.GetTaskTitles(),
+						})
+					}
 				}
 
 				kanban := views.Kanban{
@@ -62,8 +62,7 @@ func newListCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&status, "status", "s", "", "Filter by status (pending/completed)")
-	cmd.Flags().StringSliceVarP(&tags, "tags", "t", []string{}, "Filter by tags (comma-separated)")
+	cmd.Flags().StringSliceVarP(&statuses, "status", "s", []string{}, "Filter by task statuses (comma-separated)")
 
 	return cmd
 }

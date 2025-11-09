@@ -228,6 +228,10 @@ func (ph *Phase) GetWarnings() []string {
 	return result
 }
 
+func (ph *Phase) GetAssociatedStatus() Status {
+	return ph.associatedStatus
+}
+
 func (p *Project) GetOverdueReminders() []*Reminder {
 	result := []*Reminder{}
 

@@ -7,6 +7,4 @@
 
 ## 🏃 Doing
 
-* Incrementar funcionalidade do comando list para filtrar por tipos de estágio e por reminders que estão overdue
-
 ## ✅ Done

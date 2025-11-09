@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -36,33 +37,43 @@ func NewMarkdownStorage(filePaths []string, projectAliases map[string]string, de
 	return storage, nil
 }
 
-func (s *MarkdownStorage) GetProject(ctx context.Context, nameOrAlias string) (*task.Project, error) {
-	name := nameOrAlias
+func (s *MarkdownStorage) GetProjects(ctx context.Context, namesOrAliases []string) ([]*task.Project, error) {
+	names := []string{}
 
-	for k, v := range s.projectAliases {
-		if k == nameOrAlias {
-			name = v
-			break
+	for _, nameOrAlias := range namesOrAliases {
+		nameIsAlias := false
+
+		for alias, fullName := range s.projectAliases {
+			if nameOrAlias == alias {
+				nameIsAlias = true
+				names = append(names, fullName)
+				break
+			}
+		}
+
+		if !nameIsAlias {
+			names = append(names, nameOrAlias)
 		}
 	}
 
-	projects, err := s.load(&name)
+	projects, err := s.load(names)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(projects) == 0 {
-		return nil, fmt.Errorf("project with name %s could not be found", name)
+		return nil, fmt.Errorf("no projects with names %s could be found", strings.Join(names, ", "))
 	}
 
-	return projects[0], nil
+	return projects, nil
 }
 
 func (s *MarkdownStorage) GetAllProjects(ctx context.Context) ([]*task.Project, error) {
 	return s.load(nil)
 }
 
-func (s *MarkdownStorage) load(projectName *string) ([]*task.Project, error) {
+func (s *MarkdownStorage) load(filteringProjectNames []string) ([]*task.Project, error) {
+	notFilteringProjects := len(filteringProjectNames) == 0
 	result := []*task.Project{}
 
 	for _, fp := range s.filepaths {
@@ -88,21 +99,22 @@ func (s *MarkdownStorage) load(projectName *string) ([]*task.Project, error) {
 
 			// Project (# header)
 			if project, found := strings.CutPrefix(line, "# "); found {
-				if currentProject != nil && projectName != nil && currentProject.GetName() == *projectName {
-					return []*task.Project{currentProject}, nil
-				}
 				project = strings.TrimSpace(project)
 				currentProject, err = task.NewProject(project)
-				result = append(result, currentProject)
 				if err != nil {
 					return nil, err
 				}
+
+				if notFilteringProjects || slices.Contains(filteringProjectNames, currentProject.GetName()) {
+					result = append(result, currentProject)
+				}
+
 				currentPhase = nil
 				currentTask = nil
 				continue
 			}
 
-			if currentProject != nil && projectName != nil && currentProject.GetName() != *projectName {
+			if currentProject != nil && !notFilteringProjects && !slices.Contains(filteringProjectNames, currentProject.GetName()) {
 				// we are not looking for data of this project, so
 				continue
 			}
@@ -155,10 +167,6 @@ func (s *MarkdownStorage) load(projectName *string) ([]*task.Project, error) {
 
 		if err := scanner.Err(); err != nil {
 			return nil, err
-		}
-
-		if currentProject != nil && projectName != nil && currentProject.GetName() == *projectName {
-			return []*task.Project{currentProject}, nil
 		}
 
 		file.Close()

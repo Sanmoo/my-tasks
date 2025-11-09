@@ -16,8 +16,8 @@ func NewService(repo Repository) *Service {
 	}
 }
 
-func (s *Service) GetProjectByNameOrAlias(ctx context.Context, projectNameOrAlias string) (*Project, error) {
-	p, err := s.repo.GetProject(ctx, projectNameOrAlias)
+func (s *Service) GetProjectsByNamesOrAliases(ctx context.Context, projectNameOrAliases []string) ([]*Project, error) {
+	p, err := s.repo.GetProjects(ctx, projectNameOrAliases)
 	if err != nil {
 		return nil, err
 	}

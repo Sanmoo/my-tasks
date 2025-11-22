@@ -40,3 +40,4 @@ tasks.json
 
 # Build artifacts
 *.log
+.aider*

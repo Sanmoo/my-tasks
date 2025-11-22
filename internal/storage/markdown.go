@@ -147,21 +147,27 @@ func (s *MarkdownStorage) load(filteringProjectNames []string) ([]*task.Project,
 				continue
 			}
 
-			// Task item (sub bullet): directive or comment
-			if subLine, found := strings.CutPrefix(line, "  * "); found {
-				if currentTask == nil {
-					return nil, fmt.Errorf("error found in file %s: found a invalid task item declaration at line %d (line \"%s\"). all task items should be declared under a task", fp, currentLineNumber, subLine)
+			// Task item (sub bullet or sub-subbullet): directive or comment
+			// Check if the line starts with at least two spaces followed by '* '
+			if len(line) >= 3 && strings.HasPrefix(line, "  ") && strings.Contains(line, "* ") {
+				// Find the position of the first '* ' after leading spaces
+				starPos := strings.Index(line, "* ")
+				if starPos != -1 {
+					subLine := line[starPos+2:] // Get the content after '* '
+					if currentTask == nil {
+						return nil, fmt.Errorf("error found in file %s: found a invalid task item declaration at line %d (line \"%s\"). all task items should be declared under a task", fp, currentLineNumber, subLine)
+					}
+					err = s.parseSubBullet(currentTask, subbulletLine{
+						line:        subLine,
+						filePath:    fp,
+						lineNumber:  currentLineNumber,
+						projectName: currentProject.GetName(),
+					})
+					if err != nil {
+						return nil, err
+					}
+					continue
 				}
-				err = s.parseSubBullet(currentTask, subbulletLine{
-					line:        subLine,
-					filePath:    fp,
-					lineNumber:  currentLineNumber,
-					projectName: currentProject.GetName(),
-				})
-				if err != nil {
-					return nil, err
-				}
-				continue
 			}
 		}
 

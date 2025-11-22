@@ -195,7 +195,6 @@ func (s *MarkdownStorage) parseSubBullet(t *task.Task, line subbulletLine) error
 			Time:         date,
 			Acknowledged: false,
 		})
-
 		return nil
 	}
 
@@ -217,6 +216,7 @@ func (s *MarkdownStorage) parseSubBullet(t *task.Task, line subbulletLine) error
 			Time:         date,
 			Acknowledged: true,
 		})
+		return nil
 	}
 
 	// @tags directive
@@ -228,6 +228,7 @@ func (s *MarkdownStorage) parseSubBullet(t *task.Task, line subbulletLine) error
 				return err
 			}
 		}
+		return nil
 	}
 
 	// @due directive
@@ -245,6 +246,7 @@ func (s *MarkdownStorage) parseSubBullet(t *task.Task, line subbulletLine) error
 		if err := t.SetDueDate(&date); err != nil {
 			return err
 		}
+		return nil
 	}
 
 	// Regular comment

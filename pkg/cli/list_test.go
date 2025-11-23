@@ -52,6 +52,6 @@ func TestListCommand_Integration(t *testing.T) {
 		// Verify the command has the expected flags
 		statusFlag := cmd.Flags().Lookup("status")
 		assert.NotNil(t, statusFlag)
-		assert.Equal(t, "Filter by task statuses (comma-separated)", statusFlag.Usage)
+		assert.Equal(t, "Filter by task statuses (comma-separated). Available statuses: pending, running, scheduled, completed", statusFlag.Usage)
 	})
 }

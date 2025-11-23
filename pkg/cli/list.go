@@ -6,12 +6,14 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Sanmoo/my-tasks/internal/task"
 	"github.com/Sanmoo/my-tasks/pkg/views"
 	"github.com/spf13/cobra"
 )
 
 func newListCmd() *cobra.Command {
 	var statuses []string
+	var tags []string
 
 	cmd := &cobra.Command{
 		Use:   "list [project_names]",
@@ -43,10 +45,20 @@ func newListCmd() *cobra.Command {
 
 				for _, p := range project.GetPhases() {
 					if len(statuses) == 0 || slices.Contains(statuses, string(p.GetAssociatedStatus())) {
-						columns = append(columns, views.Column{
-							Name:  p.GetName(),
-							Tasks: p.GetTaskTitles(),
-						})
+						// Filter tasks by tags if specified
+						filteredTasks := []string{}
+						for _, task := range p.GetTasks() {
+							if len(tags) == 0 || hasAnyTag(task, tags) {
+								filteredTasks = append(filteredTasks, task.GetTitle())
+							}
+						}
+
+						if len(filteredTasks) > 0 {
+							columns = append(columns, views.Column{
+								Name:  p.GetName(),
+								Tasks: filteredTasks,
+							})
+						}
 					}
 				}
 
@@ -62,7 +74,19 @@ func newListCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringSliceVarP(&statuses, "status", "s", []string{}, "Filter by task statuses (comma-separated)")
+	cmd.Flags().StringSliceVarP(&statuses, "status", "s", []string{}, "Filter by task statuses (comma-separated). Available statuses: pending, running, scheduled, completed")
+	cmd.Flags().StringSliceVarP(&tags, "tags", "t", []string{}, "Filter by task tags (comma-separated)")
 
 	return cmd
+}
+
+// hasAnyTag checks if a task has any of the specified tags
+func hasAnyTag(task *task.Task, tags []string) bool {
+	taskTags := task.GetTags()
+	for _, tag := range tags {
+		if slices.Contains(taskTags, tag) {
+			return true
+		}
+	}
+	return false
 }

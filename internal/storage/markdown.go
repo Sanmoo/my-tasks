@@ -121,12 +121,12 @@ func (s *MarkdownStorage) load(filteringProjectNames []string) ([]*task.Project,
 
 			// Phase (## header)
 			if phase, found := strings.CutPrefix(line, "## "); found {
+				if currentProject == nil {
+					return nil, fmt.Errorf("error found in file %s: found a invalid phase declaration at line %d (named %s). all phases should be declared under a project", fp, currentLineNumber, phase)
+				}
 				currentPhase, err = task.NewPhase(phase, currentProject.GetName())
 				if err != nil {
 					return nil, err
-				}
-				if currentProject == nil {
-					return nil, fmt.Errorf("error found in file %s: found a invalid phase declaration at line %d (named %s). all phases should be declared under a project", fp, currentLineNumber, phase)
 				}
 				currentProject.AddPhase(currentPhase)
 				currentTask = nil

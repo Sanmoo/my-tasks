@@ -28,7 +28,7 @@ func TestMarkdownStorage_GetProjects(t *testing.T) {
 * Completed Task
   * @reminded (25-01-01 09:00:00)
 `
-	err := os.WriteFile(testFile, []byte(content), 0644)
+	err := os.WriteFile(testFile, []byte(content), 0o644)
 	require.NoError(t, err)
 
 	storage, err := NewMarkdownStorage([]string{testFile}, map[string]string{"test": "Test Project"}, "UTC")
@@ -79,7 +79,7 @@ func TestMarkdownStorage_ParseDirectives(t *testing.T) {
   * Regular comment line
     * Sub-subbullet @remind (25-01-02 11:00:00)
 `
-	err := os.WriteFile(testFile, []byte(content), 0644)
+	err := os.WriteFile(testFile, []byte(content), 0o644)
 	require.NoError(t, err)
 
 	storage, err := NewMarkdownStorage([]string{testFile}, nil, "UTC")
@@ -102,7 +102,7 @@ func TestMarkdownStorage_ParseDirectives(t *testing.T) {
 
 	// Check reminders
 	activeReminders := task.GetActiveReminders()
-	require.Len(t, activeReminders, 2) // @remind and sub-subbullet @remind
+	require.Len(t, activeReminders, 1) // Only @remind (line 75) - @reminded creates acknowledged reminder
 
 	// Check acknowledged reminder
 	// allReminders := task.GetActiveReminders()
@@ -124,7 +124,7 @@ func TestMarkdownStorage_EdgeCases(t *testing.T) {
 	t.Run("Empty file", func(t *testing.T) {
 		tempDir := t.TempDir()
 		testFile := filepath.Join(tempDir, "empty.md")
-		err := os.WriteFile(testFile, []byte(""), 0644)
+		err := os.WriteFile(testFile, []byte(""), 0o644)
 		require.NoError(t, err)
 
 		storage, err := NewMarkdownStorage([]string{testFile}, nil, "UTC")
@@ -141,7 +141,7 @@ func TestMarkdownStorage_EdgeCases(t *testing.T) {
 		content := `# Test Project
 * Task without phase
 `
-		err := os.WriteFile(testFile, []byte(content), 0644)
+		err := os.WriteFile(testFile, []byte(content), 0o644)
 		require.NoError(t, err)
 
 		storage, err := NewMarkdownStorage([]string{testFile}, nil, "UTC")
@@ -156,7 +156,7 @@ func TestMarkdownStorage_EdgeCases(t *testing.T) {
 		testFile := filepath.Join(tempDir, "invalid2.md")
 		content := `## Phase without project
 `
-		err := os.WriteFile(testFile, []byte(content), 0644)
+		err := os.WriteFile(testFile, []byte(content), 0o644)
 		require.NoError(t, err)
 
 		storage, err := NewMarkdownStorage([]string{testFile}, nil, "UTC")

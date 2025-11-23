@@ -8,13 +8,13 @@
 ---
 
 [TestKanban_Render/single_column_with_tasks - 1]
-========================== Simple Project ==========================
+========================== Project A ==========================
 
-[📋 Backlog] Task 1
-[📋 Backlog] Task 2
-[📋 Backlog] Task 3
+[TODO] Task 1
+[TODO] Task 2
+[TODO] Task 3
 
-========================== Simple Project ==========================
+========================== Project A ==========================
 
 ---
 
@@ -39,5 +39,27 @@
 [✅ Done] Task 2
 
 ========================== Mixed Project ==========================
+
+---
+
+[TestKanban_Render/multiple_columns_with_tasks - 1]
+========================== Project B ==========================
+
+[TODO] Design database schema
+[TODO] Write API documentation
+[IN PROGRESS] Implement authentication
+[DONE] Setup project structure
+[DONE] Configure CI/CD pipeline
+
+========================== Project B ==========================
+
+---
+
+[TestKanban_Render/column_with_empty_tasks - 1]
+========================== Project C ==========================
+
+[IN PROGRESS] Only task in progress
+
+========================== Project C ==========================
 
 ---

@@ -3,6 +3,7 @@ package views
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -48,8 +49,8 @@ func (trp *testReminderPanel) Render() {
 
 func TestReminderPanel_Render(t *testing.T) {
 	tests := []struct {
-		name     string
 		reminder ReminderPanel
+		name     string
 	}{
 		{
 			name:     "empty reminder panel",
@@ -120,13 +121,24 @@ func TestReminderPanel_Render(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Capture stdout
+			oldStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+
+			// Call the actual Render method
+			tt.reminder.Render()
+
+			// Restore stdout and read captured output
+			w.Close()
+			os.Stdout = oldStdout
+
 			var buf bytes.Buffer
-			testPanel := testReminderPanel{
-				ReminderPanel: tt.reminder,
-				output:        &buf,
-			}
-			testPanel.Render()
-			snaps.MatchSnapshot(t, buf.String())
+			buf.ReadFrom(r)
+			output := buf.String()
+
+			// Use snapshot testing for the actual output
+			snaps.MatchSnapshot(t, output)
 		})
 	}
 }

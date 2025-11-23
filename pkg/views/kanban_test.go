@@ -2,28 +2,11 @@ package views
 
 import (
 	"bytes"
-	"fmt"
+	"os"
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
 )
-
-// testKanban wraps the original Kanban but captures output
-type testKanban struct {
-	output *bytes.Buffer
-	Kanban
-}
-
-func (tk *testKanban) Render() {
-	// Capture the output instead of printing to stdout
-	fmt.Fprintf(tk.output, "========================== %s ==========================\n\n", tk.ProjectName)
-	for _, column := range tk.Columns {
-		for _, task := range column.Tasks {
-			fmt.Fprintf(tk.output, "[%s] %s\n", column.Name, task)
-		}
-	}
-	fmt.Fprintf(tk.output, "\n========================== %s ==========================\n", tk.ProjectName)
-}
 
 func TestKanban_Render(t *testing.T) {
 	tests := []struct {
@@ -40,51 +23,61 @@ func TestKanban_Render(t *testing.T) {
 		{
 			name: "single column with tasks",
 			kanban: Kanban{
-				ProjectName: "Simple Project",
+				ProjectName: "Project A",
 				Columns: []Column{
 					{
-						Name:  "📋 Backlog",
-						Tasks: []string{"Task 1", "Task 2", "Task 3"},
+						Name: "TODO",
+						Tasks: []string{
+							"Task 1",
+							"Task 2",
+							"Task 3",
+						},
 					},
 				},
 			},
 		},
 		{
-			name: "multiple columns",
+			name: "multiple columns with tasks",
 			kanban: Kanban{
-				ProjectName: "Complex Project",
+				ProjectName: "Project B",
 				Columns: []Column{
 					{
-						Name:  "📋 Backlog",
-						Tasks: []string{"Task 1", "Task 2"},
+						Name: "TODO",
+						Tasks: []string{
+							"Design database schema",
+							"Write API documentation",
+						},
 					},
 					{
-						Name:  "🏃 In Progress",
-						Tasks: []string{"Task 3"},
+						Name: "IN PROGRESS",
+						Tasks: []string{
+							"Implement authentication",
+						},
 					},
 					{
-						Name:  "✅ Done",
-						Tasks: []string{"Task 4", "Task 5", "Task 6"},
+						Name: "DONE",
+						Tasks: []string{
+							"Setup project structure",
+							"Configure CI/CD pipeline",
+						},
 					},
 				},
 			},
 		},
 		{
-			name: "column with no tasks",
+			name: "column with empty tasks",
 			kanban: Kanban{
-				ProjectName: "Mixed Project",
+				ProjectName: "Project C",
 				Columns: []Column{
 					{
-						Name:  "📋 Backlog",
-						Tasks: []string{"Task 1"},
-					},
-					{
-						Name:  "🏃 In Progress",
+						Name:  "TODO",
 						Tasks: []string{},
 					},
 					{
-						Name:  "✅ Done",
-						Tasks: []string{"Task 2"},
+						Name: "IN PROGRESS",
+						Tasks: []string{
+							"Only task in progress",
+						},
 					},
 				},
 			},
@@ -93,13 +86,24 @@ func TestKanban_Render(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Capture stdout
+			oldStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+
+			// Call the actual Render method
+			tt.kanban.Render()
+
+			// Restore stdout and read captured output
+			w.Close()
+			os.Stdout = oldStdout
+
 			var buf bytes.Buffer
-			tk := testKanban{
-				Kanban: tt.kanban,
-				output: &buf,
-			}
-			tk.Render()
-			snaps.MatchSnapshot(t, buf.String())
+			buf.ReadFrom(r)
+			output := buf.String()
+
+			// Use snapshot testing for the actual output
+			snaps.MatchSnapshot(t, output)
 		})
 	}
 }

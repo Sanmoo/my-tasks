@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"sort"
 	"time"
 )
 
@@ -28,9 +29,17 @@ func (rp *ReminderPanel) Render() {
 	}
 
 	fmt.Printf("============= !You Have Overdue Reminders. Please check them =============\n\n")
-	for project, reminders := range rp.Reminders {
+
+	// Sort projects for deterministic output
+	projects := make([]string, 0, len(rp.Reminders))
+	for project := range rp.Reminders {
+		projects = append(projects, project)
+	}
+	sort.Strings(projects)
+
+	for _, project := range projects {
 		fmt.Printf("PROJECT: %s\n", project)
-		for _, rem := range reminders {
+		for _, rem := range rp.Reminders[project] {
 			fmt.Printf("- %s\n", rem.Label)
 		}
 	}

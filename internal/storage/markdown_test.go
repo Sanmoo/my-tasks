@@ -169,9 +169,9 @@ func TestMarkdownStorage_EdgeCases(t *testing.T) {
 
 func TestParseDate(t *testing.T) {
 	tests := []struct {
+		expected time.Time
 		name     string
 		input    string
-		expected time.Time
 		wantErr  bool
 	}{
 		{

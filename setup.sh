@@ -1,18 +1,18 @@
 #!/bin/bash
 
-# Setup script for Tasks CLI
+# Setup script for Kanban Task Manager
 # This script initializes the Go module and downloads dependencies
 
 set -e
 
-echo "Tasks CLI - Setup Script"
-echo "========================"
+echo "Kanban Task Manager - Setup Script"
+echo "=================================="
 echo ""
 
 # Check if Go is installed
 if ! command -v go &> /dev/null; then
     echo "Error: Go is not installed"
-    echo "Please install Go 1.21 or higher from https://go.dev/dl/"
+    echo "Please install Go 1.23 or higher from https://go.dev/dl/"
     exit 1
 fi
 

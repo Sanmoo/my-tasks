@@ -1,26 +1,26 @@
-# Tasks CLI
+# Kanban Task Manager
 
-A simple, powerful, and beautiful command-line task manager written in Go.
+A powerful CLI tool for managing tasks organized in markdown-based kanban boards with built-in reminders and due dates.
 
 ## Features
 
-- Create, list, update, and delete tasks
-- Mark tasks as completed or reopen them
-- Organize tasks with priorities (1-5) and tags
-- Beautiful terminal output with colors and tables
-- JSON-based storage (no database required)
-- Clean architecture with separation of concerns
-- High code quality with extensive linting
+- **Markdown-based Storage**: Organize tasks in simple markdown files with intuitive syntax
+- **Kanban Board Views**: Beautiful terminal output showing tasks organized by phases/columns
+- **Smart Reminders**: Built-in reminder system with overdue task notifications
+- **Project Management**: Support for multiple projects with aliases and configuration
+- **Due Date Tracking**: Track task deadlines with automatic overdue detection
+- **Tag Support**: Organize tasks with custom tags for better categorization
+- **Clean Architecture**: Well-structured Go codebase with comprehensive testing
 
 ## Installation
 
 ### Prerequisites
 
-- Go 1.25 or higher
+- Go 1.23 or higher
 - (Optional) golangci-lint for code quality checks
 - (Optional) gofumpt for strict formatting
 
-### Build from source
+### Build from Source
 
 ```bash
 # Clone the repository
@@ -39,83 +39,93 @@ make install
 
 ## Usage
 
-### Add a task
+### Project Structure
 
-```bash
-# Simple task
-tasks add "Write project documentation"
+Tasks are organized in markdown files within the `kanbans/` directory. Each file represents a project with kanban-style columns:
 
-# Task with description and priority
-tasks add "Fix critical bug" -d "Memory leak in parser" -p 5
+```markdown
+# Project Name
 
-# Task with tags
-tasks add "Review PR #123" -t "review,urgent" -p 4
+## Phase Name
+
+* Task title
+* Another task
+  * @tags tag1,tag2
+  * @remind(25-10-09 23:00) reminder message
+  * @due(25-10-23) due date
+  * Additional comments as sub-bullets
 ```
 
-### List tasks
+### List Tasks from Projects
 
 ```bash
-# List all tasks
-tasks list
+# List tasks from specific projects (comma-separated)
+tasks list project1,project2
 
-# Filter by status
-tasks list --status pending
-tasks list --status completed
+# List tasks with status filtering
+tasks list project1 --status pending,running
 
-# Filter by priority
-tasks list --priority 5
-
-# Filter by tags
-tasks list --tags urgent,review
+# Use project aliases (configured in config.yaml)
+tasks list alias1,alias2
 ```
 
-### View task details
+### Check Overdue Reminders
 
 ```bash
-tasks show <task-id>
-```
-
-### Complete a task
-
-```bash
-tasks complete <task-id>
-```
-
-### Reopen a completed task
-
-```bash
-tasks reopen <task-id>
-```
-
-### Update a task
-
-```bash
-# Update title
-tasks update <task-id> --title "New title"
-
-# Update multiple fields
-tasks update <task-id> -d "Updated description" -p 4 -t "tag1,tag2"
-```
-
-### Delete a task
-
-```bash
-# With confirmation prompt
-tasks delete <task-id>
-
-# Skip confirmation
-tasks delete <task-id> --force
+# Show all overdue reminders across all projects
+tasks remind
 ```
 
 ## Configuration
 
-Tasks are stored in `~/.tasks/tasks.json` by default.
+### Project Configuration
 
-You can customize the storage location by setting the `TASKS_DATA_DIR` environment variable:
+Create a `config.yaml` file in your project directory:
 
-```bash
-export TASKS_DATA_DIR=/path/to/your/data
+```yaml
+project_aliases:
+  alias1: "Full Project Name"
+  alias2: "Another Project Name"
+
+default_project: "alias1"
+default_timezone: "Europe/Lisbon"
 ```
+
+### Markdown File Format
+
+Tasks are organized in markdown files with the following structure:
+
+```markdown
+# My Project
+
+## Backlog
+
+* Task in backlog
+* Another backlog task
+  * @tags important,backend
+
+## 🏃 Doing
+
+* Current active task
+  * Working on API integration
+  * @remind(25-10-10 18:00) check progress
+
+## 🗓️ Scheduled
+
+* Upcoming task
+  * @due(25-10-15) Deadline for completion
+  * @remind(25-10-14 09:00) start working on this
+
+## ✅ Done
+
+* Completed task
+```
+
+### Directives
+
+- `@tags(tag1,tag2)`: Add tags to tasks
+- `@remind(YYYY-MM-DD HH:MM) message`: Set reminders with messages
+- `@due(YYYY-MM-DD)`: Set due dates for tasks
 
 ## Project Structure
 
@@ -123,35 +133,43 @@ export TASKS_DATA_DIR=/path/to/your/data
 my-tasks/
 ├── cmd/
 │   └── tasks/
-│       └── main.go           # Application entrypoint
+│       └── main.go              # Application entrypoint
 ├── internal/
 │   ├── app/
-│   │   └── app.go           # Application configuration
-│   ├── task/
-│   │   ├── task.go          # Task domain model
-│   │   ├── repository.go    # Storage interface
-│   │   └── service.go       # Business logic
-│   └── storage/
-│       └── json.go          # JSON storage implementation
+│   │   ├── app.go              # Application configuration
+│   │   └── app_test.go         # Configuration tests
+│   ├── storage/
+│   │   ├── markdown.go         # Markdown storage implementation
+│   │   └── markdown_test.go    # Storage tests
+│   └── task/
+│       ├── model.go            # Domain models (Project, Phase, Task)
+│       ├── model_test.go       # Model tests
+│       ├── repository.go       # Storage interface
+│       ├── service.go          # Business logic
+│       └── service_test.go     # Service tests
+├── kanbans/                    # Markdown task files
+│   ├── sample.md               # Example project file
+│   └── tasks.md                # Your task files
 ├── pkg/
-│   └── cli/
-│       ├── root.go          # Root command
-│       ├── add.go           # Add command
-│       ├── list.go          # List command
-│       ├── complete.go      # Complete command
-│       ├── reopen.go        # Reopen command
-│       ├── delete.go        # Delete command
-│       ├── update.go        # Update command
-│       └── show.go          # Show command
-├── .golangci.yml            # Linter configuration
-├── Makefile                 # Build automation
-├── go.mod                   # Go module definition
-└── README.md                # This file
+│   ├── cli/
+│   │   ├── root.go             # Root command
+│   │   ├── list.go             # List command
+│   │   ├── remind.go           # Remind command
+│   │   └── *.test.go           # CLI tests
+│   └── views/
+│       ├── kanban.go           # Kanban board rendering
+│       ├── reminder-panel.go   # Reminder panel rendering
+│       └── *.test.go           # View tests
+├── .golangci.yml               # Linter configuration
+├── .markdownlint.jsonc         # Markdown linting rules
+├── Makefile                    # Build automation
+├── go.mod                      # Go module definition
+└── README.md                   # This file
 ```
 
 ## Development
 
-### Prerequisites for development
+### Prerequisites for Development
 
 ```bash
 # Install golangci-lint
@@ -161,7 +179,7 @@ go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 go install mvdan.cc/gofumpt@latest
 ```
 
-### Available make targets
+### Available Make Targets
 
 ```bash
 make build      # Build the application
@@ -180,10 +198,10 @@ This project follows strict code quality standards:
 
 - **Linting**: golangci-lint with 20+ enabled linters
 - **Formatting**: gofumpt (stricter than gofmt)
-- **Testing**: Test coverage with race detection
+- **Testing**: Comprehensive test coverage with race detection
 - **Architecture**: Clean architecture with clear separation of concerns
 
-### Running tests
+### Running Tests
 
 ```bash
 # Run all tests
@@ -196,22 +214,14 @@ go test -v ./...
 go test -race ./...
 ```
 
-### Code style
-
-- Follow standard Go conventions
-- Use meaningful variable and function names
-- Add comments for exported functions and types
-- Keep functions small and focused
-- Handle errors explicitly
-
 ## Architecture
 
 The project follows clean architecture principles:
 
-1. **Domain Layer** (`internal/task`): Core business logic and domain models
-2. **Storage Layer** (`internal/storage`): Data persistence implementations
-3. **Application Layer** (`internal/app`): Application setup and configuration
-4. **Presentation Layer** (`pkg/cli`): CLI commands and user interface
+1. **Domain Layer** (`internal/task`): Core business logic and domain models (Project, Phase, Task)
+2. **Storage Layer** (`internal/storage`): Markdown file parsing and data persistence
+3. **Application Layer** (`internal/app`): Application setup, configuration, and service orchestration
+4. **Presentation Layer** (`pkg/cli` and `pkg/views`): CLI commands and terminal rendering
 
 ### Key Design Patterns
 
@@ -226,12 +236,13 @@ The project follows clean architecture principles:
 
 - [cobra](https://github.com/spf13/cobra) - CLI framework
 - [pterm](https://github.com/pterm/pterm) - Beautiful terminal output
-- [uuid](https://github.com/google/uuid) - UUID generation
+- [go-snaps](https://github.com/gkampitakis/go-snaps) - Snapshot testing
 
 ### Development Dependencies
 
 - [golangci-lint](https://github.com/golangci/golangci-lint) - Linter aggregator
 - [gofumpt](https://github.com/mvdan/gofumpt) - Stricter formatter
+- [testify](https://github.com/stretchr/testify) - Testing utilities
 
 ## Contributing
 
@@ -241,6 +252,7 @@ Contributions are welcome! Please ensure:
 2. Code is properly formatted: `make fmt`
 3. No linting errors: `make lint`
 4. Add tests for new functionality
+5. Update documentation accordingly
 
 ## License
 
@@ -250,15 +262,14 @@ MIT License - feel free to use this project as you wish.
 
 Potential features for future versions:
 
-- [ ] SQLite storage backend option
-- [ ] Task due dates and reminders
-- [ ] Task dependencies
-- [ ] Task search functionality
-- [ ] Export tasks to different formats (CSV, Markdown)
-- [ ] Subtasks support
-- [ ] Task templates
-- [ ] Color themes customization
-- [ ] Shell completion scripts
+- [ ] Interactive task management (add, edit, complete tasks)
+- [ ] Multiple storage backends (JSON, SQLite, etc.)
+- [ ] Web interface for task management
+- [ ] Task search and filtering
+- [ ] Export tasks to different formats
+- [ ] Task templates and recurring tasks
+- [ ] Integration with calendar systems
+- [ ] Mobile companion app
 
 ## Support
 

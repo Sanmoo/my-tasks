@@ -41,3 +41,4 @@ tasks.json
 # Build artifacts
 *.log
 .aider*
+coverage_summary.txt

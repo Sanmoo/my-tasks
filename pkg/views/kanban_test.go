@@ -82,6 +82,32 @@ func TestKanban_Render(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "columns with emoji status indicators",
+			kanban: Kanban{
+				ProjectName: "Project D",
+				Columns: []Column{
+					{
+						Name: "🏃 Running",
+						Tasks: []string{
+							"Task in progress",
+						},
+					},
+					{
+						Name: "✅ Completed",
+						Tasks: []string{
+							"Finished task",
+						},
+					},
+					{
+						Name: "🗓️ Scheduled",
+						Tasks: []string{
+							"Future task",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -106,4 +132,93 @@ func TestKanban_Render(t *testing.T) {
 			snaps.MatchSnapshot(t, output)
 		})
 	}
+}
+
+func TestKanban_HelperMethods(t *testing.T) {
+	t.Run("formatTask", func(t *testing.T) {
+		kanban := Kanban{}
+
+		result := kanban.formatTask("Test task")
+		expected := "• Test task"
+		if result != expected {
+			t.Errorf("formatTask returned %q, expected %q", result, expected)
+		}
+	})
+
+	t.Run("renderColumn execution without panic", func(t *testing.T) {
+		kanban := Kanban{}
+
+		// Test with empty tasks
+		column1 := Column{
+			Name:  "Empty Column",
+			Tasks: []string{},
+		}
+
+		// Test with tasks
+		column2 := Column{
+			Name:  "Test Column",
+			Tasks: []string{"Task 1", "Task 2"},
+		}
+
+		// Test that renderColumn executes without panicking
+		testCases := []struct {
+			name   string
+			column Column
+		}{
+			{"empty tasks", column1},
+			{"with tasks", column2},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				defer func() {
+					if r := recover(); r != nil {
+						t.Errorf("renderColumn panicked: %v", r)
+					}
+				}()
+
+				// Capture stdout to prevent output during tests
+				oldStdout := os.Stdout
+				_, w, _ := os.Pipe()
+				os.Stdout = w
+
+				kanban.renderColumn(tc.column)
+
+				w.Close()
+				os.Stdout = oldStdout
+			})
+		}
+	})
+
+	t.Run("renderHorizontal execution without panic", func(t *testing.T) {
+		kanban := Kanban{
+			ProjectName: "Test Project",
+			Columns: []Column{
+				{
+					Name:  "Column 1",
+					Tasks: []string{"Task 1", "Task 2"},
+				},
+				{
+					Name:  "Column 2",
+					Tasks: []string{"Task 3"},
+				},
+			},
+		}
+
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("renderHorizontal panicked: %v", r)
+			}
+		}()
+
+		// Capture stdout to prevent output during tests
+		oldStdout := os.Stdout
+		_, w, _ := os.Pipe()
+		os.Stdout = w
+
+		kanban.renderHorizontal(200) // Wide terminal to force horizontal layout
+
+		w.Close()
+		os.Stdout = oldStdout
+	})
 }

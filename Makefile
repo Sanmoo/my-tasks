@@ -1,5 +1,8 @@
 .PHONY: build test lint fmt clean install help run update-snapshots test-clean
 
+# Configuration
+MIN_COVERAGE := 73
+
 # Build the application
 build:
 	@echo "Building tasks..."
@@ -9,7 +12,18 @@ build:
 test:
 	@echo "Running tests..."
 	@go test -v -race -coverprofile=coverage.out -coverpkg=./internal/...,./pkg/... ./...
-	@go tool cover -func=coverage.out
+	@echo "Checking coverage..."
+	@go tool cover -func=coverage.out | tee coverage_summary.txt
+	@echo ""
+	@echo "Checking minimum coverage of $(MIN_COVERAGE)%..."
+	@COVERAGE=$$(go tool cover -func=coverage.out | grep total | awk '{print substr($$3, 1, length($$3)-1)}'); \
+	COVERAGE_INT=$$(echo "$$COVERAGE" | sed 's/\..*//'); \
+	if [ "$$COVERAGE_INT" -lt $(MIN_COVERAGE) ]; then \
+		echo "❌ Coverage is below $(MIN_COVERAGE)%: $$COVERAGE%"; \
+		exit 1; \
+	else \
+		echo "✅ Coverage is above $(MIN_COVERAGE)%: $$COVERAGE%"; \
+	fi
 
 # Update snapshots
 update-snapshots:

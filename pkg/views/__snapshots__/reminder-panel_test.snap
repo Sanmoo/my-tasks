@@ -1,0 +1,41 @@
+
+[TestReminderPanel_Render/empty_reminder_panel - 1]
+No reminders are overdue
+---
+
+[TestReminderPanel_Render/single_project_with_single_reminder - 1]
+============= !You Have Overdue Reminders. Please check them =============
+
+PROJECT: Project A
+- Complete task documentation
+
+==========================================================================
+
+---
+
+[TestReminderPanel_Render/single_project_with_multiple_reminders - 1]
+============= !You Have Overdue Reminders. Please check them =============
+
+PROJECT: Project A
+- Complete task documentation
+- Review pull request #123
+- Update dependencies
+
+==========================================================================
+
+---
+
+[TestReminderPanel_Render/multiple_projects_with_reminders - 1]
+============= !You Have Overdue Reminders. Please check them =============
+
+PROJECT: Project A
+- Complete task documentation
+PROJECT: Project B
+- Fix critical bug in authentication
+- Update API documentation
+PROJECT: Project C
+- Prepare for team meeting
+
+==========================================================================
+
+---

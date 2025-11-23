@@ -1,0 +1,43 @@
+
+[TestKanban_Render/empty_kanban - 1]
+========================== Empty Project ==========================
+
+
+========================== Empty Project ==========================
+
+---
+
+[TestKanban_Render/single_column_with_tasks - 1]
+========================== Simple Project ==========================
+
+[📋 Backlog] Task 1
+[📋 Backlog] Task 2
+[📋 Backlog] Task 3
+
+========================== Simple Project ==========================
+
+---
+
+[TestKanban_Render/multiple_columns - 1]
+========================== Complex Project ==========================
+
+[📋 Backlog] Task 1
+[📋 Backlog] Task 2
+[🏃 In Progress] Task 3
+[✅ Done] Task 4
+[✅ Done] Task 5
+[✅ Done] Task 6
+
+========================== Complex Project ==========================
+
+---
+
+[TestKanban_Render/column_with_no_tasks - 1]
+========================== Mixed Project ==========================
+
+[📋 Backlog] Task 1
+[✅ Done] Task 2
+
+========================== Mixed Project ==========================
+
+---

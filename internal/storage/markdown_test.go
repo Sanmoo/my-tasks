@@ -15,7 +15,7 @@ func TestMarkdownStorage_GetProjects(t *testing.T) {
 	// Create a temporary test file
 	tempDir := t.TempDir()
 	testFile := filepath.Join(tempDir, "test.md")
-	
+
 	content := `# Test Project
 ## 🏃 In Progress
 * Task 1
@@ -38,7 +38,7 @@ func TestMarkdownStorage_GetProjects(t *testing.T) {
 		projects, err := storage.GetProjects(context.Background(), []string{"Test Project"})
 		require.NoError(t, err)
 		require.Len(t, projects, 1)
-		
+
 		project := projects[0]
 		assert.Equal(t, "Test Project", project.GetName())
 		assert.Len(t, project.GetPhases(), 2)
@@ -68,7 +68,7 @@ func TestMarkdownStorage_GetProjects(t *testing.T) {
 func TestMarkdownStorage_ParseDirectives(t *testing.T) {
 	tempDir := t.TempDir()
 	testFile := filepath.Join(tempDir, "directives.md")
-	
+
 	content := `# Directives Test
 ## 📋 Backlog
 * Test Task
@@ -88,34 +88,34 @@ func TestMarkdownStorage_ParseDirectives(t *testing.T) {
 	projects, err := storage.GetAllProjects(context.Background())
 	require.NoError(t, err)
 	require.Len(t, projects, 1)
-	
+
 	project := projects[0]
 	phases := project.GetPhases()
 	require.Len(t, phases, 1)
-	
+
 	phase := phases[0]
 	tasks := phase.GetTasks()
 	require.Len(t, tasks, 1)
-	
+
 	task := tasks[0]
 	assert.Equal(t, "Test Task", task.GetTitle())
-	
+
 	// Check reminders
 	activeReminders := task.GetActiveReminders()
 	require.Len(t, activeReminders, 2) // @remind and sub-subbullet @remind
-	
+
 	// Check acknowledged reminder
-	allReminders := task.GetActiveReminders()
+	// allReminders := task.GetActiveReminders()
 	// We need to find a better way to test this, but for now, let's check the count
-	
+
 	// Check tags
 	tags := task.GetTags()
 	assert.ElementsMatch(t, []string{"tag1", "tag2"}, tags)
-	
+
 	// Check due date
 	// Note: Due to the task model not exposing due date directly, we might need to adjust
 	// This test may need to be updated based on actual implementation
-	
+
 	// Check comments
 	// Similarly, comments may not be directly exposed in the current model
 }
@@ -175,22 +175,22 @@ func TestParseDate(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name:    "Valid date time with seconds",
-			input:   "25-01-01 10:30:45 UTC",
+			name:     "Valid date time with seconds",
+			input:    "25-01-01 10:30:45 UTC",
 			expected: time.Date(2025, 1, 1, 10, 30, 45, 0, time.UTC),
-			wantErr: false,
+			wantErr:  false,
 		},
 		{
-			name:    "Valid date time without seconds",
-			input:   "25-01-01 10:30 UTC",
+			name:     "Valid date time without seconds",
+			input:    "25-01-01 10:30 UTC",
 			expected: time.Date(2025, 1, 1, 10, 30, 0, 0, time.UTC),
-			wantErr: false,
+			wantErr:  false,
 		},
 		{
-			name:    "Valid date only",
-			input:   "25-01-01 UTC",
+			name:     "Valid date only",
+			input:    "25-01-01 UTC",
 			expected: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
-			wantErr: false,
+			wantErr:  false,
 		},
 		{
 			name:    "Invalid format",

@@ -39,8 +39,6 @@ make install
 
 ## Usage
 
-### Project Structure
-
 Tasks are organized in markdown files within the `kanbans/` directory. Each file represents a project with kanban-style columns:
 
 ```markdown
@@ -129,7 +127,7 @@ Tasks are organized in markdown files with the following structure:
 
 ## Project Structure
 
-```
+```txt
 my-tasks/
 ├── cmd/
 │   └── tasks/

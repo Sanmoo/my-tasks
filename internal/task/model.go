@@ -177,13 +177,25 @@ func (task *Task) GetOverdueReminders() []*Reminder {
 	result := []*Reminder{}
 
 	for _, rem := range task.reminders {
-		if !rem.Acknowledged && rem.Time.Before(time.Now()) {
+		if rem.IsOverdue() {
 			rem.TaskTitle = task.title
 			result = append(result, rem)
 		}
 	}
 
 	return result
+}
+
+func (rem *Reminder) IsOverdue() bool {
+	return !rem.Acknowledged && rem.Time.Before(time.Now())
+}
+
+func (rem *Reminder) ExpiresIn(duration time.Duration) bool {
+	return !rem.Acknowledged && rem.Time.Before(time.Now().Add(duration))
+}
+
+func (ph *Phase) GetAssociatedStatus() Status {
+	return ph.associatedStatus
 }
 
 func (ph *Phase) GetOverdueReminders() []*Reminder {
@@ -228,8 +240,14 @@ func (ph *Phase) GetWarnings() []string {
 	return result
 }
 
-func (ph *Phase) GetAssociatedStatus() Status {
-	return ph.associatedStatus
+func (ph *Phase) GetActiveReminders() []*Reminder {
+	result := []*Reminder{}
+
+	for _, task := range ph.GetTasks() {
+		result = append(result, task.GetActiveReminders()...)
+	}
+
+	return result
 }
 
 func (p *Project) GetOverdueReminders() []*Reminder {
@@ -237,6 +255,16 @@ func (p *Project) GetOverdueReminders() []*Reminder {
 
 	for _, phase := range p.GetPhases() {
 		result = append(result, phase.GetOverdueReminders()...)
+	}
+
+	return result
+}
+
+func (p *Project) GetActiveReminders() []*Reminder {
+	result := []*Reminder{}
+
+	for _, phase := range p.GetPhases() {
+		result = append(result, phase.GetActiveReminders()...)
 	}
 
 	return result

@@ -27,7 +27,7 @@ func newRemindCmd() *cobra.Command {
 
 			reminderPanel := views.NewReminderPanel()
 			for _, p := range projects {
-				for _, rem := range p.GetOverdueReminders() {
+				for _, rem := range p.GetActiveReminders() {
 					// Filter by expiring-in if specified
 					if expiringIn != "" {
 						duration, err := parseDuration(expiringIn)
@@ -36,9 +36,11 @@ func newRemindCmd() *cobra.Command {
 						}
 
 						// Check if reminder expires within the specified duration
-						if rem.Time.After(time.Now().Add(duration)) {
+						if !rem.ExpiresIn(duration) {
 							continue
 						}
+					} else if !rem.IsOverdue() {
+						continue
 					}
 
 					reminderPanel.AddReminder(views.Reminder{

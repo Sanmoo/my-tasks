@@ -43,12 +43,9 @@ func (k *Kanban) renderVertical() {
 	}
 }
 
-func (k *Kanban) renderHorizontal(terminalWidth int) {
+func (k *Kanban) renderHorizontal(_ int) {
 	// Calculate column width
-	colWidth := (terminalWidth - (len(k.Columns) * 3)) / len(k.Columns)
-	if colWidth < 20 {
-		colWidth = 20
-	}
+	// colWidth := max((terminalWidth-(len(k.Columns)*3))/len(k.Columns), 20)
 
 	// Create table data
 	tableData := pterm.TableData{}

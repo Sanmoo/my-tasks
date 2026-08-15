@@ -101,6 +101,7 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(newDoneCmd())
 	cmd.AddCommand(newReopenCmd())
 	cmd.AddCommand(newStatusCmd())
+	cmd.AddCommand(newPrioritizeCmd())
 	cmd.AddCommand(newCommentCmd())
 	cmd.AddCommand(newBookmarkCmd())
 	cmd.AddCommand(newListCmd())

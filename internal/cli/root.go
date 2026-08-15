@@ -133,18 +133,24 @@ func newHelpCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			target, rest, err := cmd.Root().Find(args)
 			if err != nil {
-				return exitcode.Usage(fmt.Errorf("unknown help topic %q", strings.Join(args, " ")))
+				return unknownHelpTopic(args)
 			}
 			// An unknown word resolves to the root command with the word
 			// left over as a trailing argument — that is an unknown
 			// topic, not a command path; so is a stray extra argument
 			// after a known command (`mt help list extra`).
 			if len(rest) > 0 {
-				return exitcode.Usage(fmt.Errorf("unknown help topic %q", strings.Join(rest, " ")))
+				return unknownHelpTopic(rest)
 			}
 			return target.Help()
 		},
 	}
+}
+
+// unknownHelpTopic wraps an unknown help topic as a usage error (exit 2),
+// matching the convention that an unknown command word is a usage error.
+func unknownHelpTopic(words []string) error {
+	return exitcode.Usage(fmt.Errorf("unknown help topic %q", strings.Join(words, " ")))
 }
 
 // resolveVault resolves the vault path for a vault-requiring command

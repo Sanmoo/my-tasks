@@ -109,7 +109,7 @@ status. Recusa sobrescrever um vault existente.
 
 ```sh
 mt init ~/dev/pkm/.vault
-# → Vault ready at ~/dev/pkm/.vault
+# → Vault ready at /home/sanmoo/dev/pkm/.vault
 ```
 
 - `--prefix <p>` — prefixo de ID (padrão: derivado do nome do diretório,
@@ -130,8 +130,11 @@ de aspas no shell.
 mt create "[Niver Edu] comprar material de Assaí"
 # → Created pkm-055
 
-mt q "ideia para depois" --label compras
-# → pkm-5qa8        (só o ID — para capturar sem sair do fluxo)
+mt create "ideia para depois" --label compras
+# → Created pkm-5qa8
+
+mt q "anotar rápido"
+# → pkm-07r0        (só o ID — para capturar sem sair do fluxo)
 ```
 
 - `--label <l>` — label livre, repetível (create).
@@ -315,7 +318,8 @@ O bookmark padrão é definido pela chave `default:` da config global.
 
 `mt help` (ou `--help`, ou `mt` sem argumentos) mostra a ajuda raiz;
 `mt help <comando>` mostra a ajuda do comando. Tópico desconhecido é erro de
-uso (exit 2).
+uso (exit 2). O comando auxiliar `mt completion <shell>` (adicionado pelo
+Cobra) gera scripts de completação para o shell.
 
 ## Configuração global
 

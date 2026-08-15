@@ -40,6 +40,9 @@ internal/issue/    pure logic: the Issue frontmatter round-trip (stable field
                    and ID generation (prefix + short random suffix, collision
                    retry)
 internal/exitcode/ pure logic: the exit code convention (0/1/2) and error mapping
+internal/deferral/ pure logic: the `mt defer` time-argument parsing — absolute
+                   YY-MM-DD HH:MM (year expanded to 20YY) and relative
+                   +<n><unit> (d/w/h) durations into the canonical value
 e2e/
   main_test.go     TestMain: builds the binary once, runs the godog suite
   features/        *.feature — one scenario per user story

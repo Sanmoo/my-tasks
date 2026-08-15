@@ -94,6 +94,10 @@ func NewRootCmd() *cobra.Command {
 	})
 	cmd.PersistentFlags().String("vault", "", "vault path (takes precedence over the default bookmark)")
 	cmd.AddCommand(newInitCmd())
+	cmd.AddCommand(newCreateCmd())
+	cmd.AddCommand(newQCmd())
+	cmd.AddCommand(newShowCmd())
+	cmd.AddCommand(newEditCmd())
 	return cmd
 }
 

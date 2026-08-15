@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -30,6 +31,9 @@ type state struct {
 	// dir is the working directory of the following mt runs ("" =
 	// inherit the test process cwd).
 	dir string
+	// id is the Issue ID remembered by the scenario (see the
+	// "I remember the issue ID" step), expanded as <id>.
+	id string
 	// result is the outcome of the last mt run.
 	result support.Result
 	// ran is true once a run has been recorded in this scenario.
@@ -46,12 +50,13 @@ func (st *state) env() []string {
 	}
 }
 
-// expand substitutes the per-scenario path placeholders in a step
-// argument: <base> is the scenario scratch directory, <vault> the
-// scenario's temporary vault.
+// expand substitutes the per-scenario placeholders in a step argument:
+// <base> is the scenario scratch directory, <vault> the scenario's
+// temporary vault, <id> the remembered issue ID.
 func (st *state) expand(arg string) string {
 	arg = strings.ReplaceAll(arg, "<base>", st.base)
 	arg = strings.ReplaceAll(arg, "<vault>", st.vault)
+	arg = strings.ReplaceAll(arg, "<id>", st.id)
 	return arg
 }
 
@@ -94,13 +99,20 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^the working directory is "([^"]*)"$`, workingDirectoryIs)
 	sc.Step(`^the exit code is (\d+)$`, exitCodeIs)
 	sc.Step(`^stdout contains "([^"]*)"$`, stdoutContains)
+	sc.Step(`^stdout does not contain "([^"]*)"$`, stdoutDoesNotContain)
+	sc.Step(`^stdout matches "([^"]*)"$`, stdoutMatches)
 	sc.Step(`^stderr contains "([^"]*)"$`, stderrContains)
 	sc.Step(`^a temporary vault exists$`, temporaryVaultExists)
 	sc.Step(`^the vault contains an issues directory$`, vaultHasIssuesDirectory)
 	sc.Step(`^a fake editor is available$`, fakeEditorAvailable)
+	sc.Step(`^the fake editor writes$`, fakeEditorWrites)
+	sc.Step(`^I remember the issue ID$`, rememberIssueID)
 	sc.Step(`^the file "([^"]*)" exists$`, fileExists)
 	sc.Step(`^the directory "([^"]*)" exists$`, dirExists)
 	sc.Step(`^the file "([^"]*)" contains "([^"]*)"$`, fileContains)
+	sc.Step(`^the file "([^"]*)" does not contain "([^"]*)"$`, fileDoesNotContain)
+	sc.Step(`^the file "([^"]*)" matches "([^"]*)"$`, fileMatches)
+	sc.Step(`^the directory "([^"]*)" contains (\d+) files$`, dirContainsNFiles)
 }
 
 func stateFrom(ctx context.Context) (*state, error) {
@@ -117,7 +129,7 @@ func iRunMt(ctx context.Context, args string) (context.Context, error) {
 		return ctx, err
 	}
 	args = st.expand(args)
-	res, err := support.RunCmdIn(support.Binary(), st.dir, strings.Fields(args), st.env())
+	res, err := support.RunCmdIn(support.Binary(), st.dir, splitArgs(args), st.env())
 	if err != nil {
 		return ctx, err
 	}
@@ -272,6 +284,174 @@ func fileContains(ctx context.Context, path, want string) (context.Context, erro
 	}
 	if !strings.Contains(string(data), want) {
 		return ctx, fmt.Errorf("%q does not contain %q:\n%s", path, want, data)
+	}
+	return ctx, nil
+}
+
+// splitArgs splits a command line into arguments, honoring double and
+// single quotes so one argument can contain spaces (e.g. a multi-word
+// title). Shell-like but minimal: no globbing, no variable expansion,
+// no escapes beyond the quotes themselves.
+func splitArgs(s string) []string {
+	var args []string
+	var cur strings.Builder
+	var quote rune
+	inArg := false
+	for _, r := range s {
+		switch {
+		case quote != 0:
+			if r == quote {
+				quote = 0
+			} else {
+				cur.WriteRune(r)
+			}
+		case r == '"' || r == '\'':
+			quote = r
+			inArg = true
+		case r == ' ' || r == '\t':
+			if inArg {
+				args = append(args, cur.String())
+				cur.Reset()
+				inArg = false
+			}
+		default:
+			cur.WriteRune(r)
+			inArg = true
+		}
+	}
+	if inArg {
+		args = append(args, cur.String())
+	}
+	return args
+}
+
+func stdoutDoesNotContain(ctx context.Context, want string) (context.Context, error) {
+	st, err := stateFrom(ctx)
+	if err != nil {
+		return ctx, err
+	}
+	if err := st.requireResult(); err != nil {
+		return ctx, err
+	}
+	if strings.Contains(st.result.Stdout, want) {
+		return ctx, fmt.Errorf("stdout contains %q (want it absent):\n%s", want, st.result.Stdout)
+	}
+	return ctx, nil
+}
+
+func stdoutMatches(ctx context.Context, pattern string) (context.Context, error) {
+	st, err := stateFrom(ctx)
+	if err != nil {
+		return ctx, err
+	}
+	if err := st.requireResult(); err != nil {
+		return ctx, err
+	}
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return ctx, fmt.Errorf("compiling regexp %q: %w", pattern, err)
+	}
+	if !re.MatchString(st.result.Stdout) {
+		return ctx, fmt.Errorf("stdout does not match %q:\n%s", pattern, st.result.Stdout)
+	}
+	return ctx, nil
+}
+
+// fakeEditorWrites replaces the scenario's fake $EDITOR with one that
+// writes the docstring content to the file mt opens, byte for byte.
+func fakeEditorWrites(ctx context.Context, doc *godog.DocString) (context.Context, error) {
+	st, err := stateFrom(ctx)
+	if err != nil {
+		return ctx, err
+	}
+	if doc == nil {
+		return ctx, errors.New("the fake editor writes needs a docstring")
+	}
+	editor, err := support.NewFakeEditor(st.base, doc.Content)
+	if err != nil {
+		return ctx, err
+	}
+	st.editor = editor
+	return ctx, nil
+}
+
+// rememberIssueID stores the issue ID from the last run's stdout. The ID
+// is the trailing whitespace-delimited token — the whole stdout for q,
+// the "Created <id>" tail for create.
+func rememberIssueID(ctx context.Context) (context.Context, error) {
+	st, err := stateFrom(ctx)
+	if err != nil {
+		return ctx, err
+	}
+	if err := st.requireResult(); err != nil {
+		return ctx, err
+	}
+	fields := strings.Fields(st.result.Stdout)
+	if len(fields) == 0 {
+		return ctx, fmt.Errorf("no issue ID in stdout:\n%s", st.result.Stdout)
+	}
+	st.id = fields[len(fields)-1]
+	return ctx, nil
+}
+
+func fileDoesNotContain(ctx context.Context, path, want string) (context.Context, error) {
+	st, err := stateFrom(ctx)
+	if err != nil {
+		return ctx, err
+	}
+	path = st.expand(path)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ctx, fmt.Errorf("reading %q: %w", path, err)
+	}
+	if strings.Contains(string(data), want) {
+		return ctx, fmt.Errorf("%q contains %q (want it absent):\n%s", path, want, data)
+	}
+	return ctx, nil
+}
+
+func fileMatches(ctx context.Context, path, pattern string) (context.Context, error) {
+	st, err := stateFrom(ctx)
+	if err != nil {
+		return ctx, err
+	}
+	path = st.expand(path)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ctx, fmt.Errorf("reading %q: %w", path, err)
+	}
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return ctx, fmt.Errorf("compiling regexp %q: %w", pattern, err)
+	}
+	if !re.MatchString(string(data)) {
+		return ctx, fmt.Errorf("%q does not match %q:\n%s", path, pattern, data)
+	}
+	return ctx, nil
+}
+
+func dirContainsNFiles(ctx context.Context, path, want string) (context.Context, error) {
+	st, err := stateFrom(ctx)
+	if err != nil {
+		return ctx, err
+	}
+	path = st.expand(path)
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return ctx, fmt.Errorf("reading directory %q: %w", path, err)
+	}
+	wantN, err := strconv.Atoi(want)
+	if err != nil {
+		return ctx, fmt.Errorf("parsing expected file count %q: %w", want, err)
+	}
+	count := 0
+	for _, e := range entries {
+		if !e.IsDir() {
+			count++
+		}
+	}
+	if count != wantN {
+		return ctx, fmt.Errorf("directory %q has %d files, want %d", path, count, wantN)
 	}
 	return ctx, nil
 }

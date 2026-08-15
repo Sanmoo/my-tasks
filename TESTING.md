@@ -35,6 +35,10 @@ internal/vault/    pure logic: global config (bookmarks + default, XDG), vault
                    config (mt.yaml: prefix, status), vault resolution
                    (@bookmark > --vault > default), @-token extraction,
                    ~ expansion, ID-prefix derivation
+internal/issue/    pure logic: the Issue frontmatter round-trip (stable field
+                   order, optional fields only-when-set, no id/updated_at)
+                   and ID generation (prefix + short random suffix, collision
+                   retry)
 internal/exitcode/ pure logic: the exit code convention (0/1/2) and error mapping
 e2e/
   main_test.go     TestMain: builds the binary once, runs the godog suite
@@ -60,12 +64,18 @@ scripts/           coverage-gate.sh
 - The CLI invokes `$EDITOR <path>` with a single file argument; the fake editor
   writes prepared content to that path, byte for byte.
 - Exit codes: `0` success, `1` user error, `2` usage error; errors go to stderr.
-- The `I run \`mt …\`` step splits its argument list on whitespace — no shell
-  quoting yet. A step needing quoted arguments (e.g. `create "title with
-  spaces"`) must grow real tokenization (or a docstring step) before its
-  scenario lands.
-- Step arguments may use the per-scenario placeholders `<base>` (scratch dir)
-  and `<vault>` (temporary vault); they are expanded before use.
+- The `I run \`mt …\`` step splits its argument list shell-style: double and
+  single quotes group an argument, so `create "title with spaces"` passes one
+  title argument. No globbing or variable expansion.
+- Step arguments may use the per-scenario placeholders `<base>` (scratch dir),
+  `<vault>` (temporary vault) and `<id>` (the issue ID remembered by the
+  `I remember the issue ID` step — the trailing stdout token of the last run);
+  they are expanded before use.
+- Assertion steps available beyond the basics: `stdout matches "<regex>"`,
+  `stdout does not contain "…"`, `the file "…" matches "<regex>"`, `the file
+  "…" does not contain "…"`, `the directory "…" contains <n> files`, and the
+  docstring step `the fake editor writes` (replaces the fake $EDITOR's content
+  for editor-flow scenarios).
 
 ## Vault addressing convention
 

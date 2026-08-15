@@ -1,0 +1,13 @@
+unleash:
+  # Per-mutant-run timeout: coefficient × coverage-run time. The default
+  # (3) is too tight for warm-cache runs of small packages and makes
+  # killed mutants flake as TIMED OUT (which drops efficacy below the
+  # gate); 30 keeps a generous budget even under machine load.
+  timeout-coefficient: 30
+  # Quality gates: efficacy and mutant coverage must stay above these
+  # values or gremlins exits non-zero. NOTE: the float64 CLI flags are
+  # broken in gremlins (viper reads them as strings), so the thresholds
+  # live here, in the config file.
+  threshold:
+    efficacy: 90
+    mutant-coverage: 90

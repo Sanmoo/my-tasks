@@ -98,6 +98,9 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(newQCmd())
 	cmd.AddCommand(newShowCmd())
 	cmd.AddCommand(newEditCmd())
+	cmd.AddCommand(newDoneCmd())
+	cmd.AddCommand(newReopenCmd())
+	cmd.AddCommand(newStatusCmd())
 	cmd.AddCommand(newBookmarkCmd())
 	return cmd
 }

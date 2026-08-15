@@ -254,6 +254,25 @@ func TestStatusListDoesNotLeakMutations(t *testing.T) {
 	}
 }
 
+func TestIsStatus(t *testing.T) {
+	def := vault.Vault{}
+	for _, s := range []string{"open", "in_progress", "done"} {
+		if !def.IsStatus(s) {
+			t.Errorf("IsStatus(%q) on the defaults = false, want true", s)
+		}
+	}
+	if def.IsStatus("blocked") {
+		t.Error("IsStatus(blocked) on the defaults = true, want false")
+	}
+	custom := vault.Vault{Status: []string{"todo", "doing", "shipped"}}
+	if !custom.IsStatus("shipped") {
+		t.Error("IsStatus(shipped) on a custom list = false, want true")
+	}
+	if custom.IsStatus("open") {
+		t.Error("IsStatus(open) on a custom list without open = true, want false")
+	}
+}
+
 func TestPrefixFor(t *testing.T) {
 	tests := []struct {
 		name string

@@ -19,9 +19,10 @@ import (
 	"github.com/Sanmoo/my-tasks2/internal/vault"
 )
 
-// createdAtFormat is the naive datetime stamp of an Issue: local time,
-// no timezone, no seconds (the spec's YYYY-MM-DDTHH:MM).
-const createdAtFormat = "2006-01-02T15:04"
+// naiveTimeFormat is the naive datetime stamp of an Issue: local time,
+// no timezone, no seconds (the spec's YYYY-MM-DDTHH:MM). It is shared
+// by created_at, started_at and completed_at.
+const naiveTimeFormat = "2006-01-02T15:04"
 
 // newCreateCmd builds `mt create <título>`: writes a new Issue file with
 // the spec schema. The title is the remaining positional args joined
@@ -91,7 +92,7 @@ func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool) er
 			Title:     title,
 			Status:    "open",
 			Labels:    labels,
-			CreatedAt: time.Now().Format(createdAtFormat),
+			CreatedAt: time.Now().Format(naiveTimeFormat),
 		},
 		Body: issue.DefaultBody,
 	}

@@ -113,6 +113,13 @@ func (v Vault) StatusList() []string {
 	return slices.Clone(DefaultStatus)
 }
 
+// IsStatus reports whether s is one of the vault's statuses: the
+// configured list, or the defaults when none is configured. It is the
+// validation of `mt status <id> <status>` against the vault's config.
+func (v Vault) IsStatus(s string) bool {
+	return slices.Contains(v.StatusList(), s)
+}
+
 // LoadVault reads the vault config from dir/mt.yaml.
 func LoadVault(dir string) (Vault, error) {
 	path := filepath.Join(dir, vaultConfigName)

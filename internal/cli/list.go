@@ -6,8 +6,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -15,7 +13,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Sanmoo/my-tasks2/internal/exitcode"
-	"github.com/Sanmoo/my-tasks2/internal/issue"
 	"github.com/Sanmoo/my-tasks2/internal/list"
 )
 
@@ -89,27 +86,13 @@ func runList(cmd *cobra.Command, all bool, statusFilter string, labelFilters []s
 // parses it into a list item. The file name (minus .md) is the ID; a
 // malformed file fails the whole list with the offending ID named.
 func loadItems(vaultDir string) ([]list.Item, error) {
-	dir := filepath.Join(vaultDir, "issues")
-	entries, err := os.ReadDir(dir)
+	files, err := readIssueFiles(vaultDir)
 	if err != nil {
-		return nil, fmt.Errorf("reading issues directory: %w", err)
+		return nil, err
 	}
-	items := make([]list.Item, 0, len(entries))
-	for _, e := range entries {
-		name := e.Name()
-		if e.IsDir() || !strings.HasSuffix(name, ".md") {
-			continue
-		}
-		id := strings.TrimSuffix(name, ".md")
-		data, err := os.ReadFile(filepath.Join(dir, name))
-		if err != nil {
-			return nil, fmt.Errorf("reading issue %s: %w", id, err)
-		}
-		i, err := issue.Parse(data)
-		if err != nil {
-			return nil, fmt.Errorf("parsing issue %s: %w", id, err)
-		}
-		items = append(items, list.Item{ID: id, Issue: i})
+	items := make([]list.Item, 0, len(files))
+	for _, file := range files {
+		items = append(items, list.Item{ID: file.ID, Issue: file.Issue})
 	}
 	return items, nil
 }

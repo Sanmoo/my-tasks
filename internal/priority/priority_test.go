@@ -230,6 +230,38 @@ func TestParseRejectsDuplicateID(t *testing.T) {
 	}
 }
 
+func TestRenormalizeRanksIncludesAllStatuses(t *testing.T) {
+	issues := []priority.Issue{
+		{ID: "done", Status: "done", Rank: ptr(9), CreatedAt: "2026-01-01T10:00"},
+		{ID: "open", Status: "open", Rank: ptr(5), CreatedAt: "2026-01-02T10:00"},
+		{ID: "backlog", Status: "blocked", CreatedAt: "2026-01-03T10:00"},
+	}
+	changes := priority.RenormalizeRanks(issues)
+	want := []priority.Change{
+		{ID: "open", Rank: ptr(1)},
+		{ID: "done", Rank: ptr(2)},
+	}
+	if len(changes) != len(want) {
+		t.Fatalf("RenormalizeRanks() = %d changes, want %d: %+v", len(changes), len(want), changes)
+	}
+	for i := range want {
+		if changes[i].ID != want[i].ID || !rankEqual(changes[i].Rank, want[i].Rank) {
+			t.Errorf("changes[%d] = %+v, want %+v", i, changes[i], want[i])
+		}
+	}
+}
+
+func TestRenormalizeRanksRepairsDuplicateRanks(t *testing.T) {
+	issues := []priority.Issue{
+		{ID: "b", Status: "done", Rank: ptr(1), CreatedAt: "2026-01-01T10:00"},
+		{ID: "a", Status: "open", Rank: ptr(1), CreatedAt: "2026-01-02T10:00"},
+	}
+	changes := priority.RenormalizeRanks(issues)
+	if len(changes) != 1 || changes[0].ID != "b" || !rankEqual(changes[0].Rank, ptr(2)) {
+		t.Errorf("RenormalizeRanks() = %+v, want b→2", changes)
+	}
+}
+
 func TestPlanReorderAndRenormalize(t *testing.T) {
 	issues := []priority.Issue{
 		{ID: "a", Status: "open", Rank: ptr(1), CreatedAt: "2026-08-15T10:00"},

@@ -12,6 +12,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Sanmoo/my-tasks2/internal/exitcode"
+	"github.com/Sanmoo/my-tasks2/internal/issue"
+	"github.com/Sanmoo/my-tasks2/internal/list"
 	"github.com/Sanmoo/my-tasks2/internal/priority"
 )
 
@@ -119,18 +121,26 @@ func loadPriorityIssues(vaultDir string) ([]priority.Issue, error) {
 	if err != nil {
 		return nil, err
 	}
+	return priorityIssuesFromItems(items), nil
+}
+
+func priorityIssueFrom(id string, i issue.Issue) priority.Issue {
+	fm := i.Frontmatter
+	return priority.Issue{
+		ID:        id,
+		Title:     fm.Title,
+		Status:    fm.Status,
+		Rank:      fm.Rank,
+		CreatedAt: fm.CreatedAt,
+	}
+}
+
+func priorityIssuesFromItems(items []list.Item) []priority.Issue {
 	issues := make([]priority.Issue, 0, len(items))
 	for _, item := range items {
-		fm := item.Issue.Frontmatter
-		issues = append(issues, priority.Issue{
-			ID:        item.ID,
-			Title:     fm.Title,
-			Status:    fm.Status,
-			Rank:      fm.Rank,
-			CreatedAt: fm.CreatedAt,
-		})
+		issues = append(issues, priorityIssueFrom(item.ID, item.Issue))
 	}
-	return issues, nil
+	return issues
 }
 
 // applyRankChanges applies each rank change in-process, without spawning a

@@ -83,6 +83,29 @@ func Compare(a, b Issue) int {
 	return cmp.Compare(a.ID, b.ID)
 }
 
+// RenormalizeRanks computes the minimal changes needed to make every ranked
+// Issue's Rank contiguous from 1 through N. It includes every status because
+// Rank is a vault-wide invariant; Backlog Issues remain unranked. Existing
+// order is preserved by Rank and ID when duplicate Ranks need a tiebreak.
+func RenormalizeRanks(issues []Issue) []Change {
+	ranked := make([]Issue, 0, len(issues))
+	for _, is := range issues {
+		if is.Rank != nil {
+			ranked = append(ranked, is)
+		}
+	}
+	slices.SortFunc(ranked, Compare)
+	changes := make([]Change, 0, len(ranked))
+	for index, is := range ranked {
+		target := index + 1
+		if is.Rank != nil && *is.Rank == target {
+			continue
+		}
+		changes = append(changes, Change{ID: is.ID, Rank: &target})
+	}
+	return changes
+}
+
 // Entry is one data line of the buffer: whether the line is prioritized
 // and the issue ID it names.
 type Entry struct {

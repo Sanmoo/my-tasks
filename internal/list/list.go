@@ -108,6 +108,21 @@ func IsFutureDeferred(deferredUntil string, now time.Time) bool {
 	return ok && t.After(now)
 }
 
+// Ready reports whether item is an open Issue available at now. An empty or
+// malformed deferred_until does not prevent availability; mt check owns
+// validation of persisted datetime fields.
+func Ready(item Item, now time.Time) bool {
+	return item.Issue.Frontmatter.Status == "open" && !IsFutureDeferred(item.Issue.Frontmatter.DeferredUntil, now)
+}
+
+// Overdue reports whether item has a Deadline before now and is not done.
+// Deadline is informational, so a future deferral does not affect this result.
+// An empty or malformed deadline is not overdue; mt check owns validation.
+func Overdue(item Item, now time.Time) bool {
+	deadline, ok := parseNaive(item.Issue.Frontmatter.Deadline)
+	return ok && deadline.Before(now) && item.Issue.Frontmatter.Status != "done"
+}
+
 // DeferSuffix returns the "[defer MM-DD HH:MM]" marker for a
 // deferred_until datetime in the future relative to now. It returns ""
 // when deferredUntil is empty, not in the future, or malformed.

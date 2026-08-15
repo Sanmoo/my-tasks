@@ -171,6 +171,62 @@ func TestIsFutureDeferred(t *testing.T) {
 	}
 }
 
+func TestReady(t *testing.T) {
+	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
+	cases := []struct {
+		name string
+		it   list.Item
+		want bool
+	}{
+		{"open without deferral is ready", item("open", "open", nil, "", ""), true},
+		{"open with past deferral is ready", item("past", "open", nil, "", "2026-08-10T08:00"), true},
+		{"open at deferred time is ready", item("now", "open", nil, "", "2026-08-15T12:00"), true},
+		{"future-deferred open is not ready", item("future", "open", nil, "", "2026-08-20T08:00"), false},
+		{"in-progress is not ready", item("progress", "in_progress", nil, "", ""), false},
+		{"done is not ready", item("done", "done", nil, "", ""), false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := list.Ready(c.it, now); got != c.want {
+				t.Errorf("Ready(%s) = %t, want %t", c.name, got, c.want)
+			}
+		})
+	}
+}
+
+func TestOverdue(t *testing.T) {
+	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
+	withDeadline := func(status, deadline string) list.Item {
+		it := item("issue", status, nil, "", "")
+		it.Issue.Frontmatter.Deadline = deadline
+		return it
+	}
+	cases := []struct {
+		name string
+		it   list.Item
+		want bool
+	}{
+		{"past deadline is overdue", withDeadline("open", "2026-08-10T08:00"), true},
+		{"future deadline is not overdue", withDeadline("open", "2026-08-20T08:00"), false},
+		{"deadline exactly now is not overdue", withDeadline("open", "2026-08-15T12:00"), false},
+		{"missing deadline is not overdue", withDeadline("open", ""), false},
+		{"malformed deadline is not overdue", withDeadline("open", "not-a-date"), false},
+		{"done issue is not overdue", withDeadline("done", "2026-08-10T08:00"), false},
+		{"deferred issue can be overdue", func() list.Item {
+			it := withDeadline("open", "2026-08-10T08:00")
+			it.Issue.Frontmatter.DeferredUntil = "2026-08-20T08:00"
+			return it
+		}(), true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := list.Overdue(c.it, now); got != c.want {
+				t.Errorf("Overdue(%s) = %t, want %t", c.name, got, c.want)
+			}
+		})
+	}
+}
+
 func TestDeferSuffix(t *testing.T) {
 	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
 	cases := []struct {

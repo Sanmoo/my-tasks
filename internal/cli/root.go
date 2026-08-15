@@ -112,6 +112,8 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(newBookmarkCmd())
 	cmd.AddCommand(newListCmd())
 	cmd.AddCommand(newCheckCmd())
+	cmd.AddCommand(newReadyCmd())
+	cmd.AddCommand(newOverdueCmd())
 	return cmd
 }
 

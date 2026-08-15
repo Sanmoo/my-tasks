@@ -1,0 +1,3 @@
+# Separate vaults with bookmarks instead of area labels
+
+O uso anterior agrupava issues por labels `area/*` dentro de um único vault nd, com ordem de prioridade em labels `rank/{area}/NNN`. Decidimos que cada domínio de trabalho é um vault separado, endereçado por bookmarks (`@nome`) definidos num arquivo de configuração global auto-detectado, com um favorito principal opcional. Não há detecção de vault pelo diretório atual: sem `@`, sem `--vault` e sem favorito principal, o comando falha com mensagem clara. A ordem de prioridade (rank) é por vault — a separação física elimina o livro-razão de labels de área e mantém simples a invariante de rank único (ver design: duplicado de rank é erro de usuário).

@@ -1,0 +1,3 @@
+# Deferral is a timestamp field, not a status
+
+No nd, adiar uma issue define `status: deferred` junto com `defer_until` (uma data). Aqui, `deferred_until` é apenas um campo de data e hora: a issue permanece `open` e fica disponível quando `now >= deferred_until`. Com isso o vocabulário de status fica mínimo (`open`, `in_progress`, `done` + personalizados) e "disponibilidade" vira computável a partir do tempo — não existe operação de "undefer", o item simplesmente volta a aparecer. É uma divergência deliberada do nd: quem conhece o nd procurará um status `deferred` e não o encontrará. Escolhemos isso porque o status era redundante com o campo de data e forçava uma transição artificial de volta a `open`.

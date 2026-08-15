@@ -1,0 +1,19 @@
+# Binário e build
+/mt
+/bin/
+/dist/
+*.test
+coverage.out
+*.coverprofile
+
+# Go workspace
+go.work
+go.work.sum
+
+# Caches de ferramentas
+.pi/
+.pi-lens/
+.ruff_cache/
+
+# Sistema
+.DS_Store

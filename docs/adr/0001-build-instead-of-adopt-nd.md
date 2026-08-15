@@ -1,0 +1,3 @@
+# Build our own tracker instead of adopting nd
+
+A pesquisa em `docs/pesquisa-issue-trackers-markdown.md` concluiu que o nd (paivot-ai/nd) cobria todos os requisitos, e o autor já o usava no dia a dia com scripts próprios. Mesmo assim, decidimos construir nosso próprio tracker. Motivos: o schema do nd é pesado para uso pessoal (assignee, type, content_hash, History, epics, dependências), defer é status em vez de campo de data, e ordem de prioridade não é cidadã de primeira classe (o autor mantinha labels `rank/{area}/NNN` + campo `priority`). Além disso, o projeto é o veículo para aprender a desenvolver com LLMs no dia a dia. Consequência: passamos a ser donos da evolução do schema, e as divergências deliberadas do nd estão registradas em 0002 e 0003.

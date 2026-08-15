@@ -31,6 +31,10 @@ make mutate         # gremlins on the pure-logic packages
 ```text
 cmd/mt/            thin main: os.Exit(cli.Execute())
 internal/cli/      cobra wiring — process concerns (args, stdio, exit codes)
+internal/vault/    pure logic: global config (bookmarks + default, XDG), vault
+                   config (mt.yaml: prefix, status), vault resolution
+                   (@bookmark > --vault > default), @-token extraction,
+                   ~ expansion, ID-prefix derivation
 internal/exitcode/ pure logic: the exit code convention (0/1/2) and error mapping
 e2e/
   main_test.go     TestMain: builds the binary once, runs the godog suite
@@ -60,3 +64,20 @@ scripts/           coverage-gate.sh
   quoting yet. A step needing quoted arguments (e.g. `create "title with
   spaces"`) must grow real tokenization (or a docstring step) before its
   scenario lands.
+- Step arguments may use the per-scenario placeholders `<base>` (scratch dir)
+  and `<vault>` (temporary vault); they are expanded before use.
+
+## Vault addressing convention
+
+- Vault-requiring commands address the vault by `@bookmark`, `--vault <path>`,
+  or the default bookmark in the global config (`@bookmark` > `--vault` >
+  `default`); with none, the command fails with instructions (exit 1).
+- The `@bookmark` token (regex `@[A-Za-z0-9_-]+`) may appear anywhere among a
+  command's positional arguments and is extracted before command parsing;
+  at most one is allowed, and bookmark names must not start with `@`.
+- The global config lives at `$XDG_CONFIG_HOME/mt/config.yaml`, or
+  `$HOME/.config/mt/config.yaml`; the vault config is `mt.yaml` at the vault
+  root.
+- `mt init [dir]` derives the ID prefix from the directory name when
+  `--prefix` is omitted (`PrefixFor`: lowercased, non-alphanumeric stripped,
+  ≤8 chars) and refuses to overwrite an existing vault config.

@@ -56,7 +56,14 @@ type Result struct {
 // inherited environment, overriding same-named ones), capturing stdout,
 // stderr and the exit code.
 func RunCmd(bin string, args, env []string) (Result, error) {
+	return RunCmdIn(bin, "", args, env)
+}
+
+// RunCmdIn runs bin like RunCmd, but with dir as the working directory
+// of the process. An empty dir inherits the caller's cwd.
+func RunCmdIn(bin, dir string, args, env []string) (Result, error) {
 	cmd := exec.Command(bin, args...)
+	cmd.Dir = dir
 	cmd.Env = mergeEnv(env)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

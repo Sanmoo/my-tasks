@@ -27,6 +27,9 @@ type state struct {
 	vault string
 	// editor is the fake $EDITOR every run uses.
 	editor *support.FakeEditor
+	// dir is the working directory of the following mt runs ("" =
+	// inherit the test process cwd).
+	dir string
 	// result is the outcome of the last mt run.
 	result support.Result
 	// ran is true once a run has been recorded in this scenario.
@@ -41,6 +44,15 @@ func (st *state) env() []string {
 		st.editor.EditorVar(),
 		"XDG_CONFIG_HOME=" + filepath.Join(st.base, "config"),
 	}
+}
+
+// expand substitutes the per-scenario path placeholders in a step
+// argument: <base> is the scenario scratch directory, <vault> the
+// scenario's temporary vault.
+func (st *state) expand(arg string) string {
+	arg = strings.ReplaceAll(arg, "<base>", st.base)
+	arg = strings.ReplaceAll(arg, "<vault>", st.vault)
+	return arg
 }
 
 func (st *state) requireResult() error {
@@ -79,12 +91,16 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	})
 
 	sc.Step(`^I run \x60mt(?: (.*))?\x60$`, iRunMt)
+	sc.Step(`^the working directory is "([^"]*)"$`, workingDirectoryIs)
 	sc.Step(`^the exit code is (\d+)$`, exitCodeIs)
 	sc.Step(`^stdout contains "([^"]*)"$`, stdoutContains)
 	sc.Step(`^stderr contains "([^"]*)"$`, stderrContains)
 	sc.Step(`^a temporary vault exists$`, temporaryVaultExists)
 	sc.Step(`^the vault contains an issues directory$`, vaultHasIssuesDirectory)
 	sc.Step(`^a fake editor is available$`, fakeEditorAvailable)
+	sc.Step(`^the file "([^"]*)" exists$`, fileExists)
+	sc.Step(`^the directory "([^"]*)" exists$`, dirExists)
+	sc.Step(`^the file "([^"]*)" contains "([^"]*)"$`, fileContains)
 }
 
 func stateFrom(ctx context.Context) (*state, error) {
@@ -100,12 +116,28 @@ func iRunMt(ctx context.Context, args string) (context.Context, error) {
 	if err != nil {
 		return ctx, err
 	}
-	res, err := support.RunCmd(support.Binary(), strings.Fields(args), st.env())
+	args = st.expand(args)
+	res, err := support.RunCmdIn(support.Binary(), st.dir, strings.Fields(args), st.env())
 	if err != nil {
 		return ctx, err
 	}
 	st.result = res
 	st.ran = true
+	return ctx, nil
+}
+
+// workingDirectoryIs sets the working directory of the following mt
+// runs. The directory is created when missing.
+func workingDirectoryIs(ctx context.Context, dir string) (context.Context, error) {
+	st, err := stateFrom(ctx)
+	if err != nil {
+		return ctx, err
+	}
+	dir = st.expand(dir)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return ctx, fmt.Errorf("creating working directory %q: %w", dir, err)
+	}
+	st.dir = dir
 	return ctx, nil
 }
 
@@ -196,6 +228,50 @@ func fakeEditorAvailable(ctx context.Context) (context.Context, error) {
 	}
 	if info.Mode()&0o111 == 0 {
 		return ctx, fmt.Errorf("fake editor %q is not executable", st.editor.Path)
+	}
+	return ctx, nil
+}
+
+func fileExists(ctx context.Context, path string) (context.Context, error) {
+	st, err := stateFrom(ctx)
+	if err != nil {
+		return ctx, err
+	}
+	path = st.expand(path)
+	if _, err := os.Stat(path); err != nil {
+		return ctx, fmt.Errorf("file %q does not exist", path)
+	}
+	return ctx, nil
+}
+
+func dirExists(ctx context.Context, path string) (context.Context, error) {
+	st, err := stateFrom(ctx)
+	if err != nil {
+		return ctx, err
+	}
+	path = st.expand(path)
+	info, err := os.Stat(path)
+	if err != nil {
+		return ctx, fmt.Errorf("directory %q does not exist", path)
+	}
+	if !info.IsDir() {
+		return ctx, fmt.Errorf("%q is not a directory", path)
+	}
+	return ctx, nil
+}
+
+func fileContains(ctx context.Context, path, want string) (context.Context, error) {
+	st, err := stateFrom(ctx)
+	if err != nil {
+		return ctx, err
+	}
+	path = st.expand(path)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ctx, fmt.Errorf("reading %q: %w", path, err)
+	}
+	if !strings.Contains(string(data), want) {
+		return ctx, fmt.Errorf("%q does not contain %q:\n%s", path, want, data)
 	}
 	return ctx, nil
 }

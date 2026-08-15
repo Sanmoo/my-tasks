@@ -54,7 +54,7 @@ func appendComment(vaultDir, id, text string) error {
 	if err != nil {
 		return err
 	}
-	anchor, err := issue.NewAnchor(rand.Reader)
+	anchor, err := issue.NextAnchor(rand.Reader, i.Body)
 	if err != nil {
 		return err
 	}

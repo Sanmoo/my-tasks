@@ -42,6 +42,33 @@ func TestNewAnchorShortReadFails(t *testing.T) {
 	}
 }
 
+func TestNextAnchorRetriesOnCollision(t *testing.T) {
+	// The first candidate is already present; the second candidate is free.
+	rng := &seqReader{data: []byte{
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+	}}
+	body := "<!-- comment: 00000000 -->"
+	got, err := issue.NextAnchor(rng, body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "11111111" {
+		t.Errorf("NextAnchor = %q, want %q", got, "11111111")
+	}
+}
+
+func TestNextAnchorExhaustsAttempts(t *testing.T) {
+	body := "<!-- comment: 00000000 -->"
+	_, err := issue.NextAnchor(bytes.NewReader(make([]byte, 8*100)), body)
+	if err == nil {
+		t.Fatal("NextAnchor(all taken) = nil error, want failure")
+	}
+	if !strings.Contains(err.Error(), "unique") {
+		t.Errorf("error %q does not mention uniqueness", err)
+	}
+}
+
 func TestAppendCommentToFreshBody(t *testing.T) {
 	got := issue.AppendComment(issue.DefaultBody, "2026-08-16T14:05", "Comprei metade da lista.", "4f2b9c1a")
 	want := "\n## Description\n## Notes\n## Comments\n### 2026-08-16T14:05\nComprei metade da lista.\n<!-- comment: 4f2b9c1a -->\n"

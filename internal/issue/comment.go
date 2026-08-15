@@ -22,12 +22,36 @@ const anchorAlphabet = "0123456789abcdef"
 // collision odds are negligible.
 const anchorLen = 8
 
+// maxAnchorAttempts bounds collision retries when allocating an anchor. A
+// collision is exceptionally unlikely, but a bound keeps a broken or
+// deterministic randomness source from hanging the command forever.
+const maxAnchorAttempts = 100
+
 // NewAnchor returns a fresh random comment anchor of anchorLen hex chars,
 // reading randomness from rng. The anchor is a stable marker: once written
 // it is never rewritten (comments are append-only), so later commands can
 // address a comment by it.
 func NewAnchor(rng io.Reader) (string, error) {
 	return randomToken(rng, anchorAlphabet, anchorLen, "comment anchor")
+}
+
+// NextAnchor returns a generated anchor that is not already present in body.
+// Existing markers are compared in their complete HTML-comment form, so an
+// anchor is unique within an Issue while the existing body remains opaque to
+// the allocator. It retries a bounded number of times before returning an
+// error.
+func NextAnchor(rng io.Reader, body string) (string, error) {
+	for range maxAnchorAttempts {
+		anchor, err := NewAnchor(rng)
+		if err != nil {
+			return "", err
+		}
+		marker := fmt.Sprintf("<!-- comment: %s -->", anchor)
+		if !strings.Contains(body, marker) {
+			return anchor, nil
+		}
+	}
+	return "", fmt.Errorf("could not allocate a unique comment anchor after %d attempts", maxAnchorAttempts)
 }
 
 // AppendComment returns body with one comment appended at the end: a ###

@@ -10,7 +10,8 @@ import (
 
 // bookmarkRe matches a vault bookmark token: @ followed by a short
 // alphanumeric name. Anything else that merely starts with @ (a bare
-// "@", a title with spaces) is left alone.
+// "@", a title with spaces) is left alone. The name grammar (letters,
+// digits, '-' and '_') is shared with bookmarkNameRe (bookmark.go).
 var bookmarkRe = regexp.MustCompile(`^@[A-Za-z0-9_-]+$`)
 
 // BookmarkFromArgs extracts the optional @bookmark token from a command

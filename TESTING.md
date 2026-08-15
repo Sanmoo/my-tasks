@@ -31,10 +31,10 @@ make mutate         # gremlins on the pure-logic packages
 ```text
 cmd/mt/            thin main: os.Exit(cli.Execute())
 internal/cli/      cobra wiring — process concerns (args, stdio, exit codes)
-internal/vault/    pure logic: global config (bookmarks + default, XDG), vault
-                   config (mt.yaml: prefix, status), vault resolution
-                   (@bookmark > --vault > default), @-token extraction,
-                   ~ expansion, ID-prefix derivation
+internal/vault/    pure logic: global config (bookmarks + default, XDG, add/
+                   remove/list round-trip), vault config (mt.yaml: prefix,
+                   status), vault resolution (@bookmark > --vault > default),
+                   @-token extraction, ~ expansion, ID-prefix derivation
 internal/issue/    pure logic: the Issue frontmatter round-trip (stable field
                    order, optional fields only-when-set, no id/updated_at)
                    and ID generation (prefix + short random suffix, collision
@@ -70,12 +70,16 @@ scripts/           coverage-gate.sh
 - Step arguments may use the per-scenario placeholders `<base>` (scratch dir),
   `<vault>` (temporary vault) and `<id>` (the issue ID remembered by the
   `I remember the issue ID` step — the trailing stdout token of the last run);
-  they are expanded before use.
+  they are expanded before use, including in the `contains`/`does not contain`
+  assertion arguments.
 - Assertion steps available beyond the basics: `stdout matches "<regex>"`,
   `stdout does not contain "…"`, `the file "…" matches "<regex>"`, `the file
   "…" does not contain "…"`, `the directory "…" contains <n> files`, and the
   docstring step `the fake editor writes` (replaces the fake $EDITOR's content
   for editor-flow scenarios).
+- Scenarios prepare files with the docstring step
+  `the file "<path>" is written with:` (the following indented block is the
+  file content, parent directories are created).
 
 ## Vault addressing convention
 
@@ -88,6 +92,10 @@ scripts/           coverage-gate.sh
 - The global config lives at `$XDG_CONFIG_HOME/mt/config.yaml`, or
   `$HOME/.config/mt/config.yaml`; the vault config is `mt.yaml` at the vault
   root.
+- `mt bookmark add <name> <path>` / `list` / `rm <name>` manage the global
+  config's bookmarks and default. Names are bare (letters, digits, '-' and
+  '_', no leading '@'). `list` marks the default with `(default)`, and `rm`
+  clears the default when it removes the default bookmark.
 - `mt init [dir]` derives the ID prefix from the directory name when
   `--prefix` is omitted (`PrefixFor`: lowercased, non-alphanumeric stripped,
   ≤8 chars) and refuses to overwrite an existing vault config.

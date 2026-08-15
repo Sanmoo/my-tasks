@@ -113,6 +113,7 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^the file "([^"]*)" does not contain "([^"]*)"$`, fileDoesNotContain)
 	sc.Step(`^the file "([^"]*)" matches "([^"]*)"$`, fileMatches)
 	sc.Step(`^the directory "([^"]*)" contains (\d+) files$`, dirContainsNFiles)
+	sc.Step(`^the file "([^"]*)" is written with:$`, fileWrittenWith)
 }
 
 func stateFrom(ctx context.Context) (*state, error) {
@@ -189,6 +190,7 @@ func streamContains(ctx context.Context, stream, want string) (context.Context, 
 	if err := st.requireResult(); err != nil {
 		return ctx, err
 	}
+	want = st.expand(want)
 	var got string
 	if stream == "stdout" {
 		got = st.result.Stdout
@@ -282,6 +284,7 @@ func fileContains(ctx context.Context, path, want string) (context.Context, erro
 	if err != nil {
 		return ctx, fmt.Errorf("reading %q: %w", path, err)
 	}
+	want = st.expand(want)
 	if !strings.Contains(string(data), want) {
 		return ctx, fmt.Errorf("%q does not contain %q:\n%s", path, want, data)
 	}
@@ -452,6 +455,24 @@ func dirContainsNFiles(ctx context.Context, path, want string) (context.Context,
 	}
 	if count != wantN {
 		return ctx, fmt.Errorf("directory %q has %d files, want %d", path, count, wantN)
+	}
+	return ctx, nil
+}
+
+// fileWrittenWith writes the docstring content to path, creating parent
+// directories as needed. It lets scenarios prepare files (e.g. the global
+// config with a default bookmark) before running mt.
+func fileWrittenWith(ctx context.Context, path string, doc *godog.DocString) (context.Context, error) {
+	st, err := stateFrom(ctx)
+	if err != nil {
+		return ctx, err
+	}
+	path = st.expand(path)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return ctx, fmt.Errorf("creating parent of %q: %w", path, err)
+	}
+	if err := os.WriteFile(path, []byte(doc.Content), 0o644); err != nil {
+		return ctx, fmt.Errorf("writing %q: %w", path, err)
 	}
 	return ctx, nil
 }

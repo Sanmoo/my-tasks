@@ -35,8 +35,8 @@ type Global struct {
 //	bookmarks:
 //	  bjd: ~/dev/github.com/Sanmoo/pkm/.vault
 type globalFile struct {
-	Default   string            `yaml:"default"`
-	Bookmarks map[string]string `yaml:"bookmarks"`
+	Default   string            `yaml:"default,omitempty"`
+	Bookmarks map[string]string `yaml:"bookmarks,omitempty"`
 }
 
 // LoadGlobal reads the global config from path. A missing file yields
@@ -64,6 +64,22 @@ func GlobalConfigPath(xdg, home string) string {
 		return filepath.Join(xdg, "mt", "config.yaml")
 	}
 	return filepath.Join(home, ".config", "mt", "config.yaml")
+}
+
+// SaveGlobal writes the global config to path, creating parent
+// directories as needed. It is the write counterpart of LoadGlobal.
+func (g Global) SaveGlobal(path string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("creating config directory: %w", err)
+	}
+	data, err := yaml.Marshal(globalFile{Default: g.Default, Bookmarks: g.Bookmarks})
+	if err != nil {
+		return fmt.Errorf("encoding global config: %w", err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return fmt.Errorf("writing global config %s: %w", path, err)
+	}
+	return nil
 }
 
 // Vault is the per-vault config (mt.yaml): the ID prefix and the

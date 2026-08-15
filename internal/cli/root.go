@@ -98,6 +98,7 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(newQCmd())
 	cmd.AddCommand(newShowCmd())
 	cmd.AddCommand(newEditCmd())
+	cmd.AddCommand(newBookmarkCmd())
 	return cmd
 }
 
@@ -111,11 +112,11 @@ func resolveVault(cmd *cobra.Command) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	home, err := os.UserHomeDir()
+	path, home, err := globalConfigPath()
 	if err != nil {
-		return "", fmt.Errorf("locating home directory: %w", err)
+		return "", err
 	}
-	global, err := vault.LoadGlobal(vault.GlobalConfigPath(os.Getenv("XDG_CONFIG_HOME"), home))
+	global, err := vault.LoadGlobal(path)
 	if err != nil {
 		return "", err
 	}

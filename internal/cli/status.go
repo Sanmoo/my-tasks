@@ -32,7 +32,7 @@ func newDoneCmd() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runMutation(cmd, args[0], func(i issue.Issue) issue.Issue {
-				return i.Done(time.Now().Format(naiveTimeFormat))
+				return i.Done(time.Now().Format(issue.NaiveLayout))
 			})
 		},
 	}

@@ -12,6 +12,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// NaiveLayout is the canonical datetime layout of every Issue datetime
+// field (created_at, deferred_until, deadline, started_at, completed_at):
+// local time, naive (no timezone), no seconds — YYYY-MM-DDTHH:MM.
+const NaiveLayout = "2006-01-02T15:04"
+
 // Frontmatter is the YAML header of an Issue file. The field order here
 // is the canonical order on disk; keep it in sync with the spec schema.
 //

@@ -58,6 +58,6 @@ func appendComment(vaultDir, id, text string) error {
 	if err != nil {
 		return err
 	}
-	i.Body = issue.AppendComment(i.Body, time.Now().Format(naiveTimeFormat), text, anchor)
+	i.Body = issue.AppendComment(i.Body, time.Now().Format(issue.NaiveLayout), text, anchor)
 	return writeIssueFile(vaultDir, id, i)
 }

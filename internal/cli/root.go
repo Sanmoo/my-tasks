@@ -103,6 +103,7 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(newStatusCmd())
 	cmd.AddCommand(newCommentCmd())
 	cmd.AddCommand(newBookmarkCmd())
+	cmd.AddCommand(newListCmd())
 	return cmd
 }
 

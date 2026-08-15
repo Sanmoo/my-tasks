@@ -4,7 +4,7 @@ GO ?= go
 # coverage gate and mutation testing. Command wiring is covered by e2e
 # behavior instead and stays out of these gates. Add new pure-logic
 # packages here as they land.
-PURE_PACKAGES := ./internal/exitcode ./internal/vault ./internal/issue
+PURE_PACKAGES := ./internal/exitcode ./internal/vault ./internal/issue ./internal/list
 COVERAGE_THRESHOLD := 90
 
 .PHONY: check build unit e2e coverage-gate mutate

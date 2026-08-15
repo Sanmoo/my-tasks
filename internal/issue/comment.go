@@ -1,0 +1,55 @@
+package issue
+
+import (
+	"fmt"
+	"io"
+	"strings"
+)
+
+// The comment feature of an Issue: a comment is a ### heading carrying a
+// naive timestamp, the comment text, and a stable HTML-comment anchor
+// (<!-- comment: <token> -->). Comments are append-only — the existing
+// body is never rewritten, only extended.
+
+// anchorAlphabet is the symbol set of a comment anchor: the hex digits
+// (the spec's example anchor is 4f2b9c1a). Its length divides 256 evenly,
+// so the modulo mapping in NewAnchor is unbiased.
+const anchorAlphabet = "0123456789abcdef"
+
+// anchorLen is the length of a comment anchor token. Short enough to read
+// at a glance, long enough that two anchors in one Issue collide only
+// after billions of comments.
+const anchorLen = 8
+
+// NewAnchor returns a fresh random comment anchor of anchorLen hex chars,
+// reading randomness from rng. The anchor is a stable marker: once written
+// it is never rewritten (comments are append-only), so later commands can
+// address a comment by it.
+func NewAnchor(rng io.Reader) (string, error) {
+	buf := make([]byte, anchorLen)
+	if _, err := io.ReadFull(rng, buf); err != nil {
+		return "", fmt.Errorf("generating comment anchor: %w", err)
+	}
+	out := make([]byte, anchorLen)
+	for i, b := range buf {
+		out[i] = anchorAlphabet[int(b)%len(anchorAlphabet)]
+	}
+	return string(out), nil
+}
+
+// AppendComment returns body with one comment appended at the end: a ###
+// heading carrying the timestamp, the comment text verbatim, then a stable
+// <!-- comment: anchor --> marker. The existing body is preserved
+// byte-for-byte — only the new block is added — and a newline is inserted
+// before the heading only when the body does not already end with one.
+// Comments is always the last body section, so appending at the end is
+// appending to Comments.
+func AppendComment(body, timestamp, text, anchor string) string {
+	var b strings.Builder
+	b.WriteString(body)
+	if !strings.HasSuffix(body, "\n") {
+		b.WriteString("\n")
+	}
+	fmt.Fprintf(&b, "### %s\n%s\n<!-- comment: %s -->\n", timestamp, text, anchor)
+	return b.String()
+}

@@ -110,6 +110,7 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^the file "([^"]*)" exists$`, fileExists)
 	sc.Step(`^the directory "([^"]*)" exists$`, dirExists)
 	sc.Step(`^the file "([^"]*)" contains "([^"]*)"$`, fileContains)
+	sc.Step(`^the file "([^"]*)" contains (\d+) occurrences of "([^"]*)"$`, fileContainsNOccurrences)
 	sc.Step(`^the file "([^"]*)" does not contain "([^"]*)"$`, fileDoesNotContain)
 	sc.Step(`^the file "([^"]*)" matches "([^"]*)"$`, fileMatches)
 	sc.Step(`^the directory "([^"]*)" contains (\d+) files$`, dirContainsNFiles)
@@ -287,6 +288,29 @@ func fileContains(ctx context.Context, path, want string) (context.Context, erro
 	want = st.expand(want)
 	if !strings.Contains(string(data), want) {
 		return ctx, fmt.Errorf("%q does not contain %q:\n%s", path, want, data)
+	}
+	return ctx, nil
+}
+
+// fileContainsNOccurrences asserts that path contains exactly n
+// occurrences of text (non-overlapping, as counted by strings.Count).
+func fileContainsNOccurrences(ctx context.Context, path, count, text string) (context.Context, error) {
+	st, err := stateFrom(ctx)
+	if err != nil {
+		return ctx, err
+	}
+	path = st.expand(path)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ctx, fmt.Errorf("reading %q: %w", path, err)
+	}
+	text = st.expand(text)
+	n, err := strconv.Atoi(count)
+	if err != nil {
+		return ctx, fmt.Errorf("parsing occurrence count %q: %w", count, err)
+	}
+	if got := strings.Count(string(data), text); got != n {
+		return ctx, fmt.Errorf("%q has %d occurrences of %q, want %d:\n%s", path, got, text, n, data)
 	}
 	return ctx, nil
 }

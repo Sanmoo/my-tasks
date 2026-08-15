@@ -8,13 +8,10 @@ package cli
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/Sanmoo/my-tasks2/internal/exitcode"
-	"github.com/Sanmoo/my-tasks2/internal/issue"
 	"github.com/Sanmoo/my-tasks2/internal/priority"
 )
 
@@ -117,36 +114,22 @@ func writeBuffer(buffer string) (string, error) {
 	return path, nil
 }
 
-// loadPriorityIssues reads every *.md file in the vault's issues/
-// directory into the minimal priority.Issue view. A malformed file fails
-// the whole command with the offending ID named.
+// loadPriorityIssues reuses the CLI's shared issue-file loader and
+// projects each parsed Issue into the minimal priority.Issue view.
 func loadPriorityIssues(vaultDir string) ([]priority.Issue, error) {
-	dir := filepath.Join(vaultDir, "issues")
-	entries, err := os.ReadDir(dir)
+	items, err := loadItems(vaultDir)
 	if err != nil {
-		return nil, fmt.Errorf("reading issues directory: %w", err)
+		return nil, err
 	}
-	issues := make([]priority.Issue, 0, len(entries))
-	for _, e := range entries {
-		name := e.Name()
-		if e.IsDir() || !strings.HasSuffix(name, ".md") {
-			continue
-		}
-		id := strings.TrimSuffix(name, ".md")
-		data, err := os.ReadFile(filepath.Join(dir, name))
-		if err != nil {
-			return nil, fmt.Errorf("reading issue %s: %w", id, err)
-		}
-		i, err := issue.Parse(data)
-		if err != nil {
-			return nil, fmt.Errorf("parsing issue %s: %w", id, err)
-		}
+	issues := make([]priority.Issue, 0, len(items))
+	for _, item := range items {
+		fm := item.Issue.Frontmatter
 		issues = append(issues, priority.Issue{
-			ID:        id,
-			Title:     i.Frontmatter.Title,
-			Status:    i.Frontmatter.Status,
-			Rank:      i.Frontmatter.Rank,
-			CreatedAt: i.Frontmatter.CreatedAt,
+			ID:        item.ID,
+			Title:     fm.Title,
+			Status:    fm.Status,
+			Rank:      fm.Rank,
+			CreatedAt: fm.CreatedAt,
 		})
 	}
 	return issues, nil
@@ -159,26 +142,12 @@ func applyRankChange(vaultDir string, ch priority.Change) error {
 	if err := checkID(ch.ID); err != nil {
 		return err
 	}
-	data, err := os.ReadFile(issuePath(vaultDir, ch.ID))
-	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("issue %s not found", ch.ID)
-		}
-		return fmt.Errorf("reading issue %s: %w", ch.ID, err)
-	}
-	i, err := issue.Parse(data)
-	if err != nil {
-		return fmt.Errorf("parsing issue %s: %w", ch.ID, err)
-	}
-	i.Frontmatter.Rank = ch.Rank
-	out, err := issue.Render(i)
+	i, err := readIssue(vaultDir, ch.ID)
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(issuePath(vaultDir, ch.ID), out, 0o644); err != nil {
-		return fmt.Errorf("writing issue %s: %w", ch.ID, err)
-	}
-	return nil
+	i.Frontmatter.Rank = ch.Rank
+	return writeIssueFile(vaultDir, ch.ID, i)
 }
 
 const prioritizeLong = `prioritize opens $EDITOR on a buffer of the vault's open and in_progress

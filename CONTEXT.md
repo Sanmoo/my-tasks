@@ -32,5 +32,9 @@ _Avoid_: snooze, adiamento, defer-como-status
 Data e hora limite de uma issue. Informativo; quando ultrapassado, a issue aparece em `overdue`.
 _Avoid_: due date, prazo
 
+**Blocked**:
+Estado computável de uma issue: ela está blocked enquanto alguma issue listada no campo `blocked_by` (mesmo vault) não está `done`. Não é um status — não há transição nem operação de desbloqueio; fechar o bloqueador desbloqueia sozinho.
+_Avoid_: status blocked, bloqueada
+
 **Status**:
-O estado de uma issue: `open`, `in_progress`, `done`, mais status personalizados definidos na configuração do vault. Não há máquina de estados imposta; apenas `pick-next` (→ `in_progress`) e `done` (terminal) têm comportamento especial.
+O estado de uma issue: `open`, `in_progress`, `done`, mais status personalizados definidos na configuração do vault. Não há máquina de estados imposta; apenas `pick-next` (→ `in_progress`, pulando issues blocked) e `done` (terminal) têm comportamento especial.

@@ -7,13 +7,18 @@ GO ?= go
 PURE_PACKAGES := ./internal/exitcode ./internal/vault ./internal/issue ./internal/list ./internal/priority ./internal/deferral ./internal/check
 COVERAGE_THRESHOLD := 90
 
-.PHONY: check build unit e2e coverage-gate mutate
+.PHONY: check build unit e2e coverage-gate mutate audit
 
 # check is the single automation target: unit + e2e + coverage gate + mutation.
 check: unit e2e coverage-gate mutate
 
 build:
 	$(GO) build -o bin/mt ./cmd/mt
+
+# audit probes every command's exit code and stderr behavior against the
+# compiled binary — the exit-code convention (0/1/2, errors on stderr).
+audit: build
+	./scripts/audit-exit-codes.sh ./bin/mt
 
 unit:
 	$(GO) test ./internal/... ./cmd/...

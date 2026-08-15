@@ -16,6 +16,13 @@ Feature: CLI basics
     Then the exit code is 2
     And stderr contains "unknown command"
 
+  Scenario: an unknown help topic is a usage error
+    When I run `mt help frobnicate`
+    Then the exit code is 2
+    And stderr contains "unknown help topic"
+    And stderr contains "Run 'mt --help' for usage."
+    And stdout does not contain "Usage:"
+
   Scenario: an unknown flag is a usage error
     When I run `mt --frobnicate`
     Then the exit code is 2

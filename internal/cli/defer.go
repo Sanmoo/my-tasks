@@ -47,7 +47,9 @@ func runDefer(cmd *cobra.Command, id, when string) error {
 	}
 	until, err := deferral.Parse(when, time.Now())
 	if err != nil {
-		return err
+		// A time argument that no parse can accept is a malformed
+		// invocation: a usage error (exit 2), like a bad rank position.
+		return exitcode.Usage(err)
 	}
 	if _, err := mutateIssue(vaultDir, id, func(i issue.Issue) issue.Issue {
 		return i.Defer(until)

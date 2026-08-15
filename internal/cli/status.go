@@ -74,7 +74,7 @@ func newStatusCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			vaultDir, err := resolveVault(cmd)
 			if err != nil {
-				return fmt.Errorf("resolving vault: %w", err)
+				return err
 			}
 			vcfg, err := vault.LoadVault(vaultDir)
 			if err != nil {
@@ -92,11 +92,12 @@ func newStatusCmd() *cobra.Command {
 }
 
 // runMutation is the shared body of done and reopen: resolve the vault,
-// then apply the mutation to the Issue.
+// then apply the mutation to the Issue. resolveVault's errors already
+// name the failing step, so they propagate unwrapped.
 func runMutation(cmd *cobra.Command, id string, mutate func(issue.Issue) issue.Issue) error {
 	vaultDir, err := resolveVault(cmd)
 	if err != nil {
-		return fmt.Errorf("resolving vault: %w", err)
+		return err
 	}
 	if err := applyMutation(cmd, vaultDir, id, mutate); err != nil {
 		return fmt.Errorf("mutating issue: %w", err)

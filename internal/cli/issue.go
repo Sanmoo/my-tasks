@@ -178,10 +178,11 @@ func issuePath(vaultDir, id string) string {
 
 // checkID guards against an ID that would escape the issues directory.
 // A real issue ID is a single file name component; anything with a path
-// separator cannot name an issue.
+// separator cannot name an issue — the invocation is malformed, so the
+// error is a usage error (exit 2) under the exit-code convention.
 func checkID(id string) error {
 	if id == "" || strings.ContainsAny(id, `/\\`) {
-		return fmt.Errorf("invalid issue ID %q", id)
+		return exitcode.Usage(fmt.Errorf("invalid issue ID %q", id))
 	}
 	return nil
 }

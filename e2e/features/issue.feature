@@ -64,6 +64,11 @@ Feature: Issue create, show and edit
     And stdout contains "## Description"
     And stdout contains "## Comments"
 
+  Scenario: a malformed issue ID is a usage error
+    When I run `mt show --vault <vault> a/b`
+    Then the exit code is 2
+    And stderr contains "invalid issue ID"
+
   Scenario: edit opens the editor and round-trips the file
     When I run `mt create --vault <vault> original`
     Then the exit code is 0

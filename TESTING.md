@@ -19,6 +19,7 @@ command wiring has no unit coverage gate — e2e behavior covers it.
 
 ```sh
 make check          # the one automation target: unit + e2e + coverage gate + mutation
+make audit         # probe exit code and stderr of every command (scripts/audit-exit-codes.sh)
 make build          # bin/mt
 make unit           # go test ./internal/... ./cmd/...
 make e2e            # godog scenarios against the compiled binary
@@ -66,7 +67,14 @@ scripts/           coverage-gate.sh
   scenarios or from the real user config.
 - The CLI invokes `$EDITOR <path>` with a single file argument; the fake editor
   writes prepared content to that path, byte for byte.
-- Exit codes: `0` success, `1` user error, `2` usage error; errors go to stderr.
+- Exit-code convention: `0` success; `1` user error — a well-formed command
+  that failed against the current state (vault undefined, issue not found,
+  nothing available, duplicate rank, invalid edit); `2` usage error — a
+  malformed invocation (unknown command/flag/help topic, wrong argument
+  count, malformed argument). Errors always go to stderr, results to stdout;
+  every error prints as `Error: <message>` and usage errors get the
+  `Run 'mt --help' for usage.` hint. `scripts/audit-exit-codes.sh` probes the
+  whole surface at once (`make audit`).
 - The `I run \`mt …\`` step splits its argument list shell-style: double and
   single quotes group an argument, so `create "title with spaces"` passes one
   title argument. No globbing or variable expansion.

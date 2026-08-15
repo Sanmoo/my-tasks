@@ -39,7 +39,7 @@ func newPickNextCmd() *cobra.Command {
 func runPickNext(cmd *cobra.Command) error {
 	vaultDir, err := resolveVault(cmd)
 	if err != nil {
-		return fmt.Errorf("resolving vault: %w", err)
+		return err
 	}
 	items, err := loadItems(vaultDir)
 	if err != nil {

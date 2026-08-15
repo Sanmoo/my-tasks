@@ -93,7 +93,7 @@ Feature: Defer issues
     Then the exit code is 0
     And I remember the issue ID
     When I run `mt defer --vault <vault> <id> not-a-time`
-    Then the exit code is 1
+    Then the exit code is 2
     And stderr contains "YY-MM-DD HH:MM"
     And the file "<vault>/issues/<id>.md" does not contain "deferred_until:"
 

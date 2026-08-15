@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -92,6 +93,10 @@ func NewRootCmd() *cobra.Command {
 	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
 		return exitcode.Usage(err)
 	})
+	// Cobra's built-in help command shows the root help with exit 0 for
+	// an unknown topic; the convention says an unknown command word is a
+	// usage error, so help topics go through the same classification.
+	cmd.SetHelpCommand(newHelpCmd())
 	cmd.PersistentFlags().String("vault", "", "vault path (takes precedence over the default bookmark)")
 	cmd.AddCommand(newInitCmd())
 	cmd.AddCommand(newCreateCmd())
@@ -115,6 +120,31 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(newReadyCmd())
 	cmd.AddCommand(newOverdueCmd())
 	return cmd
+}
+
+// newHelpCmd builds the help command with the project's error handling:
+// `mt help` and `mt help <known command>` print help and exit 0; an
+// unknown topic is a usage error (exit 2), matching `mt <unknown word>`.
+func newHelpCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "help [command]",
+		Short: "Help about any command",
+		Args:  cobra.ArbitraryArgs, // topics are validated in RunE
+		RunE: func(cmd *cobra.Command, args []string) error {
+			target, rest, err := cmd.Root().Find(args)
+			if err != nil {
+				return exitcode.Usage(fmt.Errorf("unknown help topic %q", strings.Join(args, " ")))
+			}
+			// An unknown word resolves to the root command with the word
+			// left over as a trailing argument — that is an unknown
+			// topic, not a command path; so is a stray extra argument
+			// after a known command (`mt help list extra`).
+			if len(rest) > 0 {
+				return exitcode.Usage(fmt.Errorf("unknown help topic %q", strings.Join(rest, " ")))
+			}
+			return target.Help()
+		},
+	}
 }
 
 // resolveVault resolves the vault path for a vault-requiring command
@@ -151,5 +181,10 @@ commands fail with instructions.
 
 Exit codes:
   0  success
-  1  user error (vault undefined, nothing available, duplicate rank, invalid edit)
-  2  usage error (unknown command, unknown flag, wrong arguments)`
+  1  user error — the command is well-formed but failed against the
+     current state (vault undefined, issue not found, nothing available,
+     duplicate rank, invalid edit)
+  2  usage error — the invocation is malformed (unknown command or flag,
+     wrong argument count, malformed argument)
+
+Errors always go to stderr; command results go to stdout.`

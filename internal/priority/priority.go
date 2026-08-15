@@ -1,6 +1,7 @@
-// Package priority holds the pure logic of `mt prioritize`: building the
-// $EDITOR buffer, parsing it back, and planning the rank changes
-// (renormalization 1..N with minimal rewrite). It is decision-dense, so
+// Package priority holds the pure logic of queue ordering: building the
+// `mt prioritize` $EDITOR buffer, parsing it back, and planning rank changes
+// (renormalization 1..N with minimal rewrite) for both editor and quick
+// commands. It is decision-dense, so
 // it lives at Seam 2: black-box unit tested, with the coverage and
 // mutation gates. Reading and writing the issue files themselves is a
 // process concern and stays in internal/cli.

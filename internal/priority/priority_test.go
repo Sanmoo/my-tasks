@@ -432,6 +432,132 @@ func TestPlanRejectsDuplicateDirectly(t *testing.T) {
 	}
 }
 
+func TestQuickPlanTopPromotesAndShifts(t *testing.T) {
+	issues := []priority.Issue{
+		{ID: "a", Status: "open", Rank: ptr(1), CreatedAt: "2026-08-15T10:00"},
+		{ID: "b", Status: "open", Rank: ptr(2), CreatedAt: "2026-08-16T10:00"},
+		{ID: "c", Status: "open", CreatedAt: "2026-08-17T10:00"},
+	}
+	changes, err := priority.QuickPlan(issues, "c", priority.MoveTop, 0)
+	if err != nil {
+		t.Fatalf("QuickPlan() error: %v", err)
+	}
+	want := []priority.Change{
+		{ID: "c", Rank: ptr(1)},
+		{ID: "a", Rank: ptr(2)},
+		{ID: "b", Rank: ptr(3)},
+	}
+	if len(changes) != len(want) {
+		t.Fatalf("QuickPlan() = %d changes, want %d: %+v", len(changes), len(want), changes)
+	}
+	for i := range want {
+		if changes[i].ID != want[i].ID || !rankEqual(changes[i].Rank, want[i].Rank) {
+			t.Errorf("changes[%d] = %+v, want %+v", i, changes[i], want[i])
+		}
+	}
+}
+
+func TestQuickPlanBottomReordersQueue(t *testing.T) {
+	issues := []priority.Issue{
+		{ID: "a", Status: "open", Rank: ptr(1), CreatedAt: "2026-08-15T10:00"},
+		{ID: "b", Status: "open", Rank: ptr(2), CreatedAt: "2026-08-16T10:00"},
+		{ID: "c", Status: "open", CreatedAt: "2026-08-17T10:00"},
+	}
+	changes, err := priority.QuickPlan(issues, "a", priority.MoveBottom, 0)
+	if err != nil {
+		t.Fatalf("QuickPlan() error: %v", err)
+	}
+	want := []priority.Change{
+		{ID: "b", Rank: ptr(1)},
+		{ID: "a", Rank: ptr(2)},
+	}
+	if len(changes) != len(want) {
+		t.Fatalf("QuickPlan() = %d changes, want %d: %+v", len(changes), len(want), changes)
+	}
+	for i := range want {
+		if changes[i].ID != want[i].ID || !rankEqual(changes[i].Rank, want[i].Rank) {
+			t.Errorf("changes[%d] = %+v, want %+v", i, changes[i], want[i])
+		}
+	}
+}
+
+func TestQuickPlanRankInsertsBacklogIssue(t *testing.T) {
+	issues := []priority.Issue{
+		{ID: "a", Status: "open", Rank: ptr(1), CreatedAt: "2026-08-15T10:00"},
+		{ID: "b", Status: "open", Rank: ptr(2), CreatedAt: "2026-08-16T10:00"},
+		{ID: "c", Status: "open", Rank: ptr(3), CreatedAt: "2026-08-17T10:00"},
+		{ID: "d", Status: "open", CreatedAt: "2026-08-18T10:00"},
+	}
+	changes, err := priority.QuickPlan(issues, "d", priority.MoveToRank, 2)
+	if err != nil {
+		t.Fatalf("QuickPlan() error: %v", err)
+	}
+	want := []priority.Change{
+		{ID: "d", Rank: ptr(2)},
+		{ID: "b", Rank: ptr(3)},
+		{ID: "c", Rank: ptr(4)},
+	}
+	if len(changes) != len(want) {
+		t.Fatalf("QuickPlan() = %d changes, want %d: %+v", len(changes), len(want), changes)
+	}
+	for i := range want {
+		if changes[i].ID != want[i].ID || !rankEqual(changes[i].Rank, want[i].Rank) {
+			t.Errorf("changes[%d] = %+v, want %+v", i, changes[i], want[i])
+		}
+	}
+}
+
+func TestQuickPlanUnrankShiftsRemainingQueue(t *testing.T) {
+	issues := []priority.Issue{
+		{ID: "a", Status: "open", Rank: ptr(1), CreatedAt: "2026-08-15T10:00"},
+		{ID: "b", Status: "open", Rank: ptr(2), CreatedAt: "2026-08-16T10:00"},
+		{ID: "c", Status: "open", Rank: ptr(3), CreatedAt: "2026-08-17T10:00"},
+		{ID: "d", Status: "open", CreatedAt: "2026-08-18T10:00"},
+	}
+	changes, err := priority.QuickPlan(issues, "b", priority.RemoveRank, 0)
+	if err != nil {
+		t.Fatalf("QuickPlan() error: %v", err)
+	}
+	want := []priority.Change{
+		{ID: "c", Rank: ptr(2)},
+		{ID: "b", Rank: nil},
+	}
+	if len(changes) != len(want) {
+		t.Fatalf("QuickPlan() = %d changes, want %d: %+v", len(changes), len(want), changes)
+	}
+	for i := range want {
+		if changes[i].ID != want[i].ID || !rankEqual(changes[i].Rank, want[i].Rank) {
+			t.Errorf("changes[%d] = %+v, want %+v", i, changes[i], want[i])
+		}
+	}
+}
+
+func TestQuickPlanRejectsInvalidRequest(t *testing.T) {
+	issues := []priority.Issue{
+		{ID: "a", Status: "open", Rank: ptr(1), CreatedAt: "2026-08-15T10:00"},
+		{ID: "done", Status: "done", Rank: ptr(2), CreatedAt: "2026-08-16T10:00"},
+	}
+	tests := []struct {
+		name   string
+		id     string
+		action priority.QuickAction
+		pos    int
+		want   string
+	}{
+		{name: "unknown issue", id: "ghost", action: priority.MoveTop, want: "unknown issue ID"},
+		{name: "done issue", id: "done", action: priority.MoveTop, want: "cannot be prioritized"},
+		{name: "zero rank", id: "a", action: priority.MoveToRank, pos: 0, want: "between 1 and 1"},
+		{name: "rank beyond queue", id: "a", action: priority.MoveToRank, pos: 2, want: "between 1 and 1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := priority.QuickPlan(issues, tt.id, tt.action, tt.pos); err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("QuickPlan() error = %v, want %q", err, tt.want)
+			}
+		})
+	}
+}
+
 // rankEqual compares two *int ranks, treating nil as a value equal only
 // to nil. It mirrors the semantics under test.
 func rankEqual(a, b *int) bool {

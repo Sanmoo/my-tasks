@@ -78,10 +78,8 @@ func runPrioritize(cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	for _, ch := range changes {
-		if err := applyRankChange(vaultDir, ch); err != nil {
-			return err
-		}
+	if err := applyRankChanges(vaultDir, changes); err != nil {
+		return err
 	}
 
 	word := "issues"
@@ -135,9 +133,19 @@ func loadPriorityIssues(vaultDir string) ([]priority.Issue, error) {
 	return issues, nil
 }
 
-// applyRankChange writes the new rank (nil = Backlog) into the issue
-// file, preserving everything else. It is in-process: no subprocess is
-// spawned per issue.
+// applyRankChanges applies each rank change in-process, without spawning a
+// subprocess per issue.
+func applyRankChanges(vaultDir string, changes []priority.Change) error {
+	for _, ch := range changes {
+		if err := applyRankChange(vaultDir, ch); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// applyRankChange writes the new rank (nil = Backlog) into the issue file,
+// preserving everything else.
 func applyRankChange(vaultDir string, ch priority.Change) error {
 	if err := checkID(ch.ID); err != nil {
 		return err

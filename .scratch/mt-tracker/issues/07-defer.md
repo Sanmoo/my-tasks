@@ -43,3 +43,21 @@
   exatamente `d`/`w`/`h` (as da spec); minutos/meses são rejeitados. (3)
   a mensagem de confirmação `<id> deferred until <canonical>` é decisão
   local (a spec não define o output do `defer`).
+
+### Code review (2 eixos, paralelos)
+
+- Primeira revisão encontrou dois pontos e ambos foram corrigidos: `Defer`
+  preservava `in_progress` (contradizia CONTEXT/ADR-0002 e a story 29),
+  então agora força `open` e há cobertura unit/e2e; `mt defer` repetia o
+  pipeline de carregar/mutar/persistir, então `mutateIssue` foi
+  centralizado em `internal/cli/status.go` e reutilizado pelos comandos.
+- A revisão também levantou overflow na multiplicação de durações relativas;
+  `Parse` agora rejeita valores acima do limite de `time.Duration`, com
+  bordas seguras e overflow cobertos na unit.
+- Segunda revisão (Standards + Spec): nenhum blocker, violação de padrão,
+  smell Fowler ou gap de spec restante. `pick-next` não foi duplicado aqui:
+  seu filtro de deferral pertence ao ticket posterior 10; este ticket cobre
+  a gravação e a visibilidade via `list`.
+- Verificação final: `make check` passou (unit, 6 cenários de defer no e2e,
+  coverage gate; 100% de eficácia de mutação em todos os pacotes, 100% de
+  cobertura de linhas em `internal/deferral`).

@@ -24,18 +24,25 @@ func NewID(prefix, suffix string) string {
 	return prefix + "-" + suffix
 }
 
-// RandomSuffix returns a random n-char suffix drawn from suffixAlphabet,
-// reading randomness from rng.
-func RandomSuffix(rng io.Reader, n int) (string, error) {
+// randomToken returns n chars drawn from alphabet, reading randomness from
+// rng. what names the token in errors (e.g. "random suffix", "comment
+// anchor").
+func randomToken(rng io.Reader, alphabet string, n int, what string) (string, error) {
 	buf := make([]byte, n)
 	if _, err := io.ReadFull(rng, buf); err != nil {
-		return "", fmt.Errorf("generating random suffix: %w", err)
+		return "", fmt.Errorf("generating %s: %w", what, err)
 	}
 	out := make([]byte, n)
 	for i, b := range buf {
-		out[i] = suffixAlphabet[int(b)%len(suffixAlphabet)]
+		out[i] = alphabet[int(b)%len(alphabet)]
 	}
 	return string(out), nil
+}
+
+// RandomSuffix returns a random n-char suffix drawn from suffixAlphabet,
+// reading randomness from rng.
+func RandomSuffix(rng io.Reader, n int) (string, error) {
+	return randomToken(rng, suffixAlphabet, n, "random suffix")
 }
 
 // NextID returns a fresh issue ID for prefix that is not in taken,

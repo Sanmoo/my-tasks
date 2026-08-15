@@ -133,6 +133,17 @@ func readIssue(vaultDir, id string) (issue.Issue, error) {
 // writeIssue renders i and writes it back to its file in the vault,
 // then prints the "<id> is now <status>" confirmation.
 func writeIssue(cmd *cobra.Command, vaultDir, id string, i issue.Issue) error {
+	if err := writeIssueFile(vaultDir, id, i); err != nil {
+		return err
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "%s is now %s\n", id, i.Frontmatter.Status)
+	return nil
+}
+
+// writeIssueFile renders i and writes it back to its file in the vault.
+// It is the shared render-and-persist tail of the mutating commands; the
+// confirmation line is the caller's concern.
+func writeIssueFile(vaultDir, id string, i issue.Issue) error {
 	data, err := issue.Render(i)
 	if err != nil {
 		return err
@@ -140,6 +151,5 @@ func writeIssue(cmd *cobra.Command, vaultDir, id string, i issue.Issue) error {
 	if err := os.WriteFile(issuePath(vaultDir, id), data, 0o644); err != nil {
 		return fmt.Errorf("writing issue %s: %w", id, err)
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "%s is now %s\n", id, i.Frontmatter.Status)
 	return nil
 }

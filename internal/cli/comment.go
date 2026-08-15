@@ -6,7 +6,6 @@ package cli
 import (
 	"crypto/rand"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -43,14 +42,14 @@ The existing body is preserved byte-for-byte (append-only).`,
 				return err
 			}
 			text := strings.Join(args[1:], " ")
-			return appendComment(cmd, vaultDir, id, text)
+			return appendComment(vaultDir, id, text)
 		},
 	}
 }
 
 // appendComment loads the Issue for id, appends a timestamped comment with
 // a fresh stable anchor and writes it back.
-func appendComment(cmd *cobra.Command, vaultDir, id, text string) error {
+func appendComment(vaultDir, id, text string) error {
 	i, err := readIssue(vaultDir, id)
 	if err != nil {
 		return err
@@ -60,12 +59,5 @@ func appendComment(cmd *cobra.Command, vaultDir, id, text string) error {
 		return err
 	}
 	i.Body = issue.AppendComment(i.Body, time.Now().Format(naiveTimeFormat), text, anchor)
-	data, err := issue.Render(i)
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(issuePath(vaultDir, id), data, 0o644); err != nil {
-		return fmt.Errorf("writing issue %s: %w", id, err)
-	}
-	return nil
+	return writeIssueFile(vaultDir, id, i)
 }

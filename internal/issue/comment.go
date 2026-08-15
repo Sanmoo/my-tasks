@@ -16,9 +16,10 @@ import (
 // so the modulo mapping in NewAnchor is unbiased.
 const anchorAlphabet = "0123456789abcdef"
 
-// anchorLen is the length of a comment anchor token. Short enough to read
-// at a glance, long enough that two anchors in one Issue collide only
-// after billions of comments.
+// anchorLen is the length of a comment anchor token (8 hex chars, 32
+// bits), matching the spec's example (4f2b9c1a). An anchor only needs to
+// be unique within its own Issue; at personal scale (tens of comments) the
+// collision odds are negligible.
 const anchorLen = 8
 
 // NewAnchor returns a fresh random comment anchor of anchorLen hex chars,
@@ -26,15 +27,7 @@ const anchorLen = 8
 // it is never rewritten (comments are append-only), so later commands can
 // address a comment by it.
 func NewAnchor(rng io.Reader) (string, error) {
-	buf := make([]byte, anchorLen)
-	if _, err := io.ReadFull(rng, buf); err != nil {
-		return "", fmt.Errorf("generating comment anchor: %w", err)
-	}
-	out := make([]byte, anchorLen)
-	for i, b := range buf {
-		out[i] = anchorAlphabet[int(b)%len(anchorAlphabet)]
-	}
-	return string(out), nil
+	return randomToken(rng, anchorAlphabet, anchorLen, "comment anchor")
 }
 
 // AppendComment returns body with one comment appended at the end: a ###

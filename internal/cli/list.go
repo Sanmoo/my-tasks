@@ -53,11 +53,10 @@ func runList(cmd *cobra.Command, all bool, statusFilter string, labelFilters []s
 	if err != nil {
 		return err
 	}
-	items, err := loadItems(vaultDir)
+	items, err := loadSortedItems(vaultDir)
 	if err != nil {
 		return err
 	}
-	list.Sort(items)
 
 	if dups := list.DuplicateRanks(items); len(dups) > 0 {
 		fmt.Fprintln(cmd.ErrOrStderr(), duplicateRanksWarning(dups))
@@ -70,16 +69,33 @@ func runList(cmd *cobra.Command, all bool, statusFilter string, labelFilters []s
 		if !list.Visible(it, opts, now) {
 			continue
 		}
-		fm := it.Issue.Frontmatter
-		line := fmt.Sprintf("%s %s  %s", list.Glyph(fm.Status), it.ID, fm.Title)
+		line := formatListLine(it)
 		if all {
-			if suffix := list.DeferSuffix(fm.DeferredUntil, now); suffix != "" {
+			if suffix := list.DeferSuffix(it.Issue.Frontmatter.DeferredUntil, now); suffix != "" {
 				line += " " + suffix
 			}
 		}
 		fmt.Fprintln(out, line)
 	}
 	return nil
+}
+
+// loadSortedItems reads every Issue in the vault and orders the result
+// according to the shared list order.
+func loadSortedItems(vaultDir string) ([]list.Item, error) {
+	items, err := loadItems(vaultDir)
+	if err != nil {
+		return nil, err
+	}
+	list.Sort(items)
+	return items, nil
+}
+
+// formatListLine renders the standard one-line Issue representation used by
+// list and its focused query views.
+func formatListLine(it list.Item) string {
+	fm := it.Issue.Frontmatter
+	return fmt.Sprintf("%s %s  %s", list.Glyph(fm.Status), it.ID, fm.Title)
 }
 
 // loadItems reads every *.md file in the vault's issues/ directory and

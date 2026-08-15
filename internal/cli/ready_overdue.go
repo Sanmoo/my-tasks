@@ -54,17 +54,15 @@ func runIssueQuery(cmd *cobra.Command, matches func(list.Item, time.Time) bool) 
 	if err != nil {
 		return err
 	}
-	items, err := loadItems(vaultDir)
+	items, err := loadSortedItems(vaultDir)
 	if err != nil {
 		return err
 	}
-	list.Sort(items)
 
 	now := time.Now()
 	for _, item := range items {
 		if matches(item, now) {
-			fm := item.Issue.Frontmatter
-			fmt.Fprintf(cmd.OutOrStdout(), "%s %s  %s\n", list.Glyph(fm.Status), item.ID, fm.Title)
+			fmt.Fprintln(cmd.OutOrStdout(), formatListLine(item))
 		}
 	}
 	return nil

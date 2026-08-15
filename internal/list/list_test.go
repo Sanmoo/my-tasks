@@ -5,6 +5,7 @@ package list_test
 
 import (
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -230,6 +231,110 @@ func TestVisible(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			if got := list.Visible(c.it, c.opts, now); got != c.want {
 				t.Errorf("Visible(%s) = %t, want %t", c.name, got, c.want)
+			}
+		})
+	}
+}
+
+func TestPickNextChoosesLowestRankedAvailableOpenIssue(t *testing.T) {
+	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
+	items := []list.Item{
+		item("backlog-old", "open", nil, "2020-01-01T10:00", ""),
+		item("rank-two", "open", intPtr(2), "2026-08-14T10:00", ""),
+		item("rank-one", "open", intPtr(1), "2026-08-15T10:00", ""),
+		item("in-progress", "in_progress", intPtr(-1), "2026-08-13T10:00", ""),
+		item("done", "done", intPtr(-2), "2026-08-12T10:00", ""),
+		item("deferred", "open", intPtr(-3), "2026-08-11T10:00", "2026-08-20T08:00"),
+	}
+
+	got, err := list.PickNext(items, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != "rank-one" {
+		t.Errorf("PickNext() = %s, want rank-one", got.ID)
+	}
+}
+
+func TestPickNextUsesAvailableBacklogWhenNoRankedCandidate(t *testing.T) {
+	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
+	items := []list.Item{
+		item("future-old", "open", nil, "2020-01-01T10:00", "2026-08-20T08:00"),
+		item("backlog-newer", "open", nil, "2026-08-16T10:00", ""),
+		item("backlog-id-b", "open", nil, "2026-08-15T10:00", ""),
+		item("backlog-id-a", "open", nil, "2026-08-15T10:00", ""),
+	}
+
+	got, err := list.PickNext(items, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != "backlog-id-a" {
+		t.Errorf("PickNext() = %s, want backlog-id-a", got.ID)
+	}
+}
+
+func TestPickNextTreatsDeferredUntilNowAsAvailable(t *testing.T) {
+	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
+	items := []list.Item{
+		item("at-now", "open", intPtr(1), "2026-08-15T10:00", "2026-08-15T12:00"),
+	}
+
+	got, err := list.PickNext(items, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != "at-now" {
+		t.Errorf("PickNext() = %s, want at-now", got.ID)
+	}
+}
+
+func TestPickNextDoesNotReorderInput(t *testing.T) {
+	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
+	items := []list.Item{
+		item("backlog", "open", nil, "2026-08-16T10:00", ""),
+		item("ranked", "open", intPtr(1), "2026-08-15T10:00", ""),
+	}
+
+	if _, err := list.PickNext(items, now); err != nil {
+		t.Fatal(err)
+	}
+	if got := ids(items); !slices.Equal(got, []string{"backlog", "ranked"}) {
+		t.Errorf("PickNext reordered input: %v", got)
+	}
+}
+
+func TestPickNextRejectsDuplicateRanks(t *testing.T) {
+	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
+	items := []list.Item{
+		item("open", "open", intPtr(1), "2026-08-15T10:00", ""),
+		item("in-progress", "in_progress", intPtr(1), "2026-08-15T11:00", ""),
+	}
+
+	if _, err := list.PickNext(items, now); err == nil || !strings.Contains(err.Error(), "duplicate rank") {
+		t.Fatalf("PickNext() error = %v, want duplicate-rank error", err)
+	}
+}
+
+func TestPickNextRejectsWhenNothingIsAvailable(t *testing.T) {
+	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
+	cases := []struct {
+		name  string
+		items []list.Item
+	}{
+		{name: "empty vault"},
+		{name: "no open issues", items: []list.Item{
+			item("progress", "in_progress", nil, "2026-08-15T10:00", ""),
+			item("done", "done", nil, "2026-08-15T11:00", ""),
+		}},
+		{name: "all open issues deferred", items: []list.Item{
+			item("future", "open", nil, "2026-08-15T10:00", "2026-08-20T08:00"),
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := list.PickNext(tc.items, now); err == nil || !strings.Contains(err.Error(), "no available") {
+				t.Fatalf("PickNext() error = %v, want no-available error", err)
 			}
 		})
 	}

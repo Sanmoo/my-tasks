@@ -1,7 +1,7 @@
-// Package list holds the pure logic of `mt list`: the priority ordering
-// of issues (Rank → Backlog by created_at → ID), the per-status glyphs,
-// the visibility rules (done/future-deferred hiding, status/label
-// filters), the deferred-until availability/suffix rules, and
+// Package list holds the pure logic of `mt list` and `mt pick-next`: the
+// Rank ordering of issues (Rank → Backlog by created_at → ID), the
+// per-status glyphs, the visibility rules (done/future-deferred hiding,
+// status/label filters), the deferred-until availability/suffix rules, and
 // duplicate-rank detection. It is decision-dense, so it lives at Seam 2:
 // black-box unit tested, with the coverage and mutation gates. Reading
 // the issue files themselves is a process concern and stays in
@@ -10,6 +10,8 @@ package list
 
 import (
 	"cmp"
+	"errors"
+	"fmt"
 	"slices"
 	"sort"
 	"time"
@@ -151,6 +153,34 @@ func Visible(item Item, opts Options, now time.Time) bool {
 		return false
 	}
 	return true
+}
+
+// PickNext returns the first available open Issue under the Rank order:
+// the lowest rank wins; when no ranked candidate is
+// available, the oldest Backlog Issue wins, with ID as the final tie-break.
+// Future-deferred Issues are unavailable, while a deferred_until exactly at
+// now is available. Duplicate ranks anywhere in the vault are rejected
+// before candidate selection, including ranks on non-open Issues.
+func PickNext(items []Item, now time.Time) (Item, error) {
+	if dups := DuplicateRanks(items); len(dups) > 0 {
+		return Item{}, fmt.Errorf("duplicate rank: %d", dups[0])
+	}
+
+	candidates := make([]Item, 0, len(items))
+	for _, item := range items {
+		if item.Issue.Frontmatter.Status != "open" {
+			continue
+		}
+		if IsFutureDeferred(item.Issue.Frontmatter.DeferredUntil, now) {
+			continue
+		}
+		candidates = append(candidates, item)
+	}
+	if len(candidates) == 0 {
+		return Item{}, errors.New("no available open issues")
+	}
+	Sort(candidates)
+	return candidates[0], nil
 }
 
 // hasAnyLabel reports whether labels contains at least one of filters.

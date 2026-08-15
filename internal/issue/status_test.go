@@ -93,6 +93,34 @@ func TestReopenDropsTimestampsFromDisk(t *testing.T) {
 	}
 }
 
+func TestStartStampsStartedAtAndSetsInProgress(t *testing.T) {
+	i := populated()
+	got := i.Start("2026-08-22T12:00")
+
+	if got.Frontmatter.Status != "in_progress" {
+		t.Errorf("Status = %q, want %q", got.Frontmatter.Status, "in_progress")
+	}
+	if got.Frontmatter.StartedAt != "2026-08-22T12:00" {
+		t.Errorf("StartedAt = %q, want the stamped time", got.Frontmatter.StartedAt)
+	}
+	if got.Frontmatter.CompletedAt != "2026-08-22T10:00" || got.Frontmatter.Rank == nil || *got.Frontmatter.Rank != 2 {
+		t.Errorf("Start changed unrelated fields: %+v", got.Frontmatter)
+	}
+	if i.Frontmatter.Status != "in_progress" || i.Frontmatter.StartedAt != "2026-08-21T09:00" {
+		t.Errorf("Start mutated the receiver: %+v", i.Frontmatter)
+	}
+}
+
+func TestStartRendersStartedAt(t *testing.T) {
+	got, err := issue.Render(populated().Start("2026-08-22T12:00"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "started_at: 2026-08-22T12:00") {
+		t.Errorf("rendered issue misses started_at:\n%s", got)
+	}
+}
+
 func TestSetStatusChangesOnlyStatus(t *testing.T) {
 	i := populated()
 	got := i.SetStatus("blocked")

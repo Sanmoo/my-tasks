@@ -102,6 +102,7 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(newReopenCmd())
 	cmd.AddCommand(newStatusCmd())
 	cmd.AddCommand(newDeferCmd())
+	cmd.AddCommand(newPickNextCmd())
 	cmd.AddCommand(newPrioritizeCmd())
 	cmd.AddCommand(newTopCmd())
 	cmd.AddCommand(newBottomCmd())
@@ -122,17 +123,21 @@ func NewRootCmd() *cobra.Command {
 func resolveVault(cmd *cobra.Command) (string, error) {
 	vaultFlag, err := cmd.Flags().GetString("vault")
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("reading --vault flag: %w", err)
 	}
 	path, home, err := globalConfigPath()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("locating global config: %w", err)
 	}
 	global, err := vault.LoadGlobal(path)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("loading global config: %w", err)
 	}
-	return vault.Resolve(bookmark, vaultFlag, global, home)
+	resolved, err := vault.Resolve(bookmark, vaultFlag, global, home)
+	if err != nil {
+		return "", fmt.Errorf("resolving vault: %w", err)
+	}
+	return resolved, nil
 }
 
 const rootLong = `mt is a personal, git-friendly issue tracker: one Markdown file per Issue,

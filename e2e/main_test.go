@@ -13,6 +13,10 @@ import (
 	"github.com/Sanmoo/my-tasks2/e2e/support"
 )
 
+// TestFeatures is an entry point that makes go test invoke TestMain,
+// where the Godog suite is executed.
+func TestFeatures(t *testing.T) {}
+
 func TestMain(m *testing.M) {
 	dir, err := os.MkdirTemp("", "mt-e2e-bin-")
 	if err != nil {

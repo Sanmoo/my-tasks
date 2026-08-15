@@ -5,6 +5,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -73,11 +74,11 @@ func newStatusCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			vaultDir, err := resolveVault(cmd)
 			if err != nil {
-				return err
+				return fmt.Errorf("resolving vault: %w", err)
 			}
 			vcfg, err := vault.LoadVault(vaultDir)
 			if err != nil {
-				return err
+				return fmt.Errorf("loading vault: %w", err)
 			}
 			if !vcfg.IsStatus(args[1]) {
 				return fmt.Errorf("status %q is not in the vault's status list (valid: %s)",
@@ -95,9 +96,12 @@ func newStatusCmd() *cobra.Command {
 func runMutation(cmd *cobra.Command, id string, mutate func(issue.Issue) issue.Issue) error {
 	vaultDir, err := resolveVault(cmd)
 	if err != nil {
-		return err
+		return fmt.Errorf("resolving vault: %w", err)
 	}
-	return applyMutation(cmd, vaultDir, id, mutate)
+	if err := applyMutation(cmd, vaultDir, id, mutate); err != nil {
+		return fmt.Errorf("mutating issue: %w", err)
+	}
+	return nil
 }
 
 // applyMutation applies and persists a mutation, then prints the new
@@ -129,10 +133,12 @@ func mutateIssue(vaultDir, id string, mutate func(issue.Issue) issue.Issue) (iss
 }
 
 // readIssue loads and parses the Issue file for id inside vaultDir.
+// O_NOFOLLOW keeps a symlink in the issues directory from redirecting the
+// read outside the Vault, including if the path changes after discovery.
 func readIssue(vaultDir, id string) (issue.Issue, error) {
-	data, err := os.ReadFile(issuePath(vaultDir, id))
+	data, err := readIssueData(vaultDir, id)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return issue.Issue{}, fmt.Errorf("issue %s not found", id)
 		}
 		return issue.Issue{}, fmt.Errorf("reading issue %s: %w", id, err)
@@ -146,14 +152,24 @@ func readIssue(vaultDir, id string) (issue.Issue, error) {
 
 // writeIssueFile renders i and writes it back to its file in the vault.
 // It is the shared render-and-persist tail of the mutating commands; the
-// confirmation line is the caller's concern.
+// O_NOFOLLOW flag prevents a symlink from redirecting the write outside the
+// Vault. The confirmation line is the caller's concern.
 func writeIssueFile(vaultDir, id string, i issue.Issue) error {
 	data, err := issue.Render(i)
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(issuePath(vaultDir, id), data, 0o644); err != nil {
+	f, err := openIssueFile(vaultDir, id, os.O_WRONLY|os.O_TRUNC)
+	if err != nil {
 		return fmt.Errorf("writing issue %s: %w", id, err)
+	}
+	_, writeErr := f.Write(data)
+	closeErr := f.Close()
+	if writeErr != nil {
+		return fmt.Errorf("writing issue %s: %w", id, writeErr)
+	}
+	if closeErr != nil {
+		return fmt.Errorf("closing issue %s: %w", id, closeErr)
 	}
 	return nil
 }

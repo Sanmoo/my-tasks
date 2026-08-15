@@ -18,6 +18,11 @@ import (
 // two-digit year with zero-padded month, day, hour and minute.
 const absoluteLayout = "06-01-02 15:04"
 
+// maxDuration is the largest duration time.Time.Add can represent without
+// overflowing its nanosecond count. Relative counts are checked against it
+// before multiplying by their unit duration.
+const maxDuration = time.Duration(1<<63 - 1)
+
 // Parse converts a `mt defer` time argument to the canonical
 // deferred_until value (issue.NaiveLayout, YYYY-MM-DDTHH:MM naive local
 // time). It accepts:
@@ -75,7 +80,11 @@ func parseRelative(s string, now time.Time) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("invalid defer duration %q: unit must be d (days), w (weeks) or h (hours)", s)
 	}
-	return now.Add(time.Duration(n) * per).Format(issue.NaiveLayout), nil
+	count := time.Duration(n)
+	if count > maxDuration/per {
+		return "", invalidDuration(s)
+	}
+	return now.Add(count * per).Format(issue.NaiveLayout), nil
 }
 
 // invalidDuration renders the shared error for a malformed relative

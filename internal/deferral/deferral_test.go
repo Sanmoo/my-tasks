@@ -59,6 +59,7 @@ func TestParseRelative(t *testing.T) {
 		{"week crossing a month", "+3w", "2026-09-05T14:30"},
 		{"nine days", "+9d", "2026-08-24T14:30"},
 		{"nineteen hours", "+19h", "2026-08-16T09:30"},
+		{"largest safe day count", "+106751d", "2318-11-24T14:30"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -113,6 +114,7 @@ func TestParseRejectsMalformed(t *testing.T) {
 		{"no plus", "2d"},
 		{"double plus", "++2d"},
 		{"overflowing number", "+99999999999999999999d"},
+		{"duration multiplication overflow", "+106752d"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

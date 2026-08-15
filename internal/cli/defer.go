@@ -13,11 +13,12 @@ import (
 
 	"github.com/Sanmoo/my-tasks2/internal/deferral"
 	"github.com/Sanmoo/my-tasks2/internal/exitcode"
+	"github.com/Sanmoo/my-tasks2/internal/issue"
 )
 
 // newDeferCmd builds `mt defer <id> <when>`: sets deferred_until on the
-// Issue, keeping its status unchanged. The Issue simply becomes
-// unavailable until the time arrives — there is no "undefer".
+// Issue and leaves it open. The Issue simply becomes unavailable until
+// the time arrives — there is no "undefer".
 func newDeferCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "defer <id> <when>",
@@ -44,26 +45,21 @@ func runDefer(cmd *cobra.Command, id, when string) error {
 	if err != nil {
 		return err
 	}
-	if err := checkID(id); err != nil {
-		return err
-	}
 	until, err := deferral.Parse(when, time.Now())
 	if err != nil {
 		return err
 	}
-	i, err := readIssue(vaultDir, id)
-	if err != nil {
-		return err
-	}
-	if err := writeIssueFile(vaultDir, id, i.Defer(until)); err != nil {
+	if _, err := mutateIssue(vaultDir, id, func(i issue.Issue) issue.Issue {
+		return i.Defer(until)
+	}); err != nil {
 		return err
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "%s deferred until %s\n", id, until)
 	return nil
 }
 
-const deferLong = `defer sets an Issue's deferred_until, keeping its status: the
-Issue stays open and simply becomes unavailable until the moment
+const deferLong = `defer sets an Issue's deferred_until and leaves it open:
+the Issue simply becomes unavailable until the moment
 arrives (now >= deferred_until), then reappears on its own — there is
 no "undefer".
 

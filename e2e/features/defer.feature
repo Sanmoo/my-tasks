@@ -33,6 +33,17 @@ Feature: Defer issues
     And the file "<vault>/issues/<id>.md" matches "deferred_until: [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}"
     And the file "<vault>/issues/<id>.md" contains "status: open"
 
+  Scenario: deferring an in-progress Issue returns it to open
+    When I run `mt create --vault <vault> "adiar trabalho em andamento"`
+    Then the exit code is 0
+    And I remember the issue ID
+    When I run `mt status --vault <vault> <id> in_progress`
+    Then the exit code is 0
+    When I run `mt defer --vault <vault> <id> 99-01-01 00:00`
+    Then the exit code is 0
+    And the file "<vault>/issues/<id>.md" contains "status: open"
+    And the file "<vault>/issues/<id>.md" contains "deferred_until: 2099-01-01T00:00"
+
   Scenario: a deferred issue hides from list until its time arrives
     Given the file "<vault>/issues/pkm-001.md" is written with:
       """

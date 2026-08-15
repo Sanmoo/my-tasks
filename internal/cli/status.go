@@ -100,18 +100,32 @@ func runMutation(cmd *cobra.Command, id string, mutate func(issue.Issue) issue.I
 	return applyMutation(cmd, vaultDir, id, mutate)
 }
 
-// applyMutation loads the Issue for id, applies mutate, writes it back
-// and prints the new status. It is the shared tail of done, reopen and
-// status.
+// applyMutation applies and persists a mutation, then prints the new
+// status. It is the shared tail of done, reopen and status.
 func applyMutation(cmd *cobra.Command, vaultDir, id string, mutate func(issue.Issue) issue.Issue) error {
-	if err := checkID(id); err != nil {
-		return err
-	}
-	i, err := readIssue(vaultDir, id)
+	i, err := mutateIssue(vaultDir, id, mutate)
 	if err != nil {
 		return err
 	}
-	return writeIssue(cmd, vaultDir, id, mutate(i))
+	fmt.Fprintf(cmd.OutOrStdout(), "%s is now %s\n", id, i.Frontmatter.Status)
+	return nil
+}
+
+// mutateIssue loads the Issue for id, applies mutate and persists the
+// result. Callers own any command-specific confirmation output.
+func mutateIssue(vaultDir, id string, mutate func(issue.Issue) issue.Issue) (issue.Issue, error) {
+	if err := checkID(id); err != nil {
+		return issue.Issue{}, err
+	}
+	i, err := readIssue(vaultDir, id)
+	if err != nil {
+		return issue.Issue{}, err
+	}
+	i = mutate(i)
+	if err := writeIssueFile(vaultDir, id, i); err != nil {
+		return issue.Issue{}, err
+	}
+	return i, nil
 }
 
 // readIssue loads and parses the Issue file for id inside vaultDir.
@@ -128,16 +142,6 @@ func readIssue(vaultDir, id string) (issue.Issue, error) {
 		return issue.Issue{}, fmt.Errorf("parsing issue %s: %w", id, err)
 	}
 	return i, nil
-}
-
-// writeIssue renders i and writes it back to its file in the vault,
-// then prints the "<id> is now <status>" confirmation.
-func writeIssue(cmd *cobra.Command, vaultDir, id string, i issue.Issue) error {
-	if err := writeIssueFile(vaultDir, id, i); err != nil {
-		return err
-	}
-	fmt.Fprintf(cmd.OutOrStdout(), "%s is now %s\n", id, i.Frontmatter.Status)
-	return nil
 }
 
 // writeIssueFile renders i and writes it back to its file in the vault.

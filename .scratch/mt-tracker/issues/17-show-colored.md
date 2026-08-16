@@ -8,10 +8,14 @@
 
 **Blocked by:** —
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Pacote pure-logic `internal/show` com `Render(issue, id, color)` — header, metadados (opcionais só quando set), corpo (glamour quando color, cru quando não)
-- [ ] `mt show` parseia e renderiza; detecção de cor (NO_COLOR / CLICOLOR / CLICOLOR_FORCE / TTY) no cli
-- [ ] Unit tests black-box de `internal/show` (glyphs, cores por status, campos opcionais, ANSI on/off)
-- [ ] Cenários e2e de `show` atualizados para a vista estruturada (sem cor: header, metadados, corpo cru)
-- [ ] `internal/show` em PURE_PACKAGES (coverage ≥90% + mutation)
+- [x] Pacote pure-logic `internal/show` com `Render(issue, id, color)` — header, metadados (opcionais só quando set), corpo (glamour quando color, cru quando não)
+- [x] `mt show` parseia e renderiza; detecção de cor (NO_COLOR / CLICOLOR / CLICOLOR_FORCE / TTY) no cli
+- [x] Unit tests black-box de `internal/show` (glyphs, cores por status, campos opcionais, ANSI on/off)
+- [x] Cenários e2e de `show` atualizados para a vista estruturada (sem cor: header, metadados, corpo cru)
+- [x] `internal/show` em PURE_PACKAGES (coverage ≥90% + mutation)
+
+### Implementado
+
+`internal/show` (novo pacote pure-logic, 96.6% coverage, 97.3% efficacy no gremlins — o único mutante vivo é equivalente: `> 100` vs `>= 100` no cap de wrap). `Render(issue, id, Options{Color, Width})`: header `◐ id . título [status]` com glyph/cores da paleta ayu do nd, metadados (Created, Labels, Rank, Deferred until, Deadline, Started, Completed, Blocked by — opcionais só quando set, datetimes T→espaço), corpo via glamour (dark/light por `MT_THEME`/`COLORFGBG`/default dark, wrap min(largura, 100), default 80). `ShouldUseColor(tty)` segue no-color.org: `NO_COLOR` > `CLICOLOR=0` > `CLICOLOR_FORCE` > TTY. No cli, `show` parseia (issue malformada agora é erro exit 1, não dump cru) e detecta TTY/largura via `x/term`; a vista estruturada vale também em pipe, sem ANSI (como o `nd show`). E2e: cenários atualizados (vista estruturada, campos opcionais, ANSI via `CLICOLOR_FORCE`); harness ganhou step `the environment variable ... is ...` e expansão de placeholders em `stdout matches`/`stdout does not contain` (bug latente — `does not contain "<id>"` nunca expandia). Deps novas: `charmbracelet/glamour` + `golang.org/x/term`. README atualizado.

@@ -1,6 +1,6 @@
 // Package list holds the pure logic of `mt list` and `mt pick-next`: the
 // Rank ordering of issues (Rank → Backlog by created_at → ID), the
-// per-status glyphs, the visibility rules (done/future-deferred hiding,
+// per-status glyphs, the visibility rules (only done hides by default;
 // status/label filters), the deferred-until availability/suffix rules,
 // the computed blocked state (an Issue is blocked while any ID in its
 // blocked_by is not done), and duplicate-rank detection. It is
@@ -231,8 +231,9 @@ type Options struct {
 }
 
 // Visible reports whether item appears in a list view under opts at time
-// now. done and future-deferred issues are hidden unless opts.All or an
-// explicit opts.Status asks for them; opts.Labels narrow the view to
+// now. done issues are hidden unless opts.All or an explicit opts.Status
+// asks for them; a future deferral does not hide an issue (the [defer ...]
+// suffix signals its unavailability); opts.Labels narrow the view to
 // issues carrying at least one of the labels.
 func Visible(item Item, opts Options, now time.Time) bool {
 	fm := item.Issue.Frontmatter
@@ -241,9 +242,6 @@ func Visible(item Item, opts Options, now time.Time) bool {
 			return false
 		}
 	} else if !opts.All && fm.Status == "done" {
-		return false
-	}
-	if !opts.All && IsFutureDeferred(fm.DeferredUntil, now) {
 		return false
 	}
 	if len(opts.Labels) > 0 && !hasAnyLabel(fm.Labels, opts.Labels) {

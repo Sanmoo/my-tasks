@@ -3,8 +3,9 @@ Feature: Defer issues
   mt defer <id> <when> sets deferred_until keeping the Issue open: it
   accepts an absolute YY-MM-DD HH:MM (the hour is kept, not truncated)
   and relative durations (+2d, +1w, +3h) computed from now. A deferred
-  Issue disappears from list until now >= deferred_until, then reappears
-  on its own; when the deferral is expired, mt undefer archives the
+  Issue stays visible in list, marked with a [defer ...] suffix, and
+  becomes available on its own when now >= deferred_until; when the
+  deferral is expired, mt undefer archives the
   reminder. The datetime parsing is
   decision-dense pure logic covered at Seam 2 (internal/deferral); these
   scenarios cover the process: the compiled binary against a temporary
@@ -45,7 +46,7 @@ Feature: Defer issues
     And the file "<vault>/issues/<id>.md" contains "status: open"
     And the file "<vault>/issues/<id>.md" contains "deferred_until: 2099-01-01T00:00"
 
-  Scenario: a deferred issue hides from list until its time arrives
+  Scenario: a deferred issue stays visible in list with a [defer ...] suffix until its time arrives
     Given the file "<vault>/issues/pkm-001.md" is written with:
       """
       ---
@@ -83,7 +84,7 @@ Feature: Defer issues
     When I run `mt list --vault <vault>`
     Then the exit code is 0
     And stdout contains "pkm-001"
-    And stdout does not contain "pkm-002"
+    And stdout contains "pkm-002  later [defer 01-01 00:00]"
     When I run `mt list --vault <vault> --all`
     Then the exit code is 0
     And stdout contains "pkm-001"

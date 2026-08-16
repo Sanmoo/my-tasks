@@ -2,9 +2,9 @@ Feature: List issues
 
   mt list shows the vault's issues in priority order — ranked first
   (lowest rank first), then the Backlog by created_at, then ID — with a
-  status glyph per line. done and future-deferred issues are hidden by
-  default (--all reveals them, marking future-deferred with a
-  [defer MM-DD HH:MM] suffix); --status and --label narrow the view; a
+  status glyph per line. Only done issues are hidden by default (--all
+  shows them too); future-deferred issues are always shown, marked with
+  a [defer MM-DD HH:MM] suffix; --status and --label narrow the view; a
   duplicate rank prints a warning to stderr. The ordering comparator is
   decision-dense pure logic covered at Seam 2 (internal/list); these
   scenarios cover the process: the compiled binary against a temporary
@@ -164,7 +164,7 @@ Feature: List issues
     Then the exit code is 0
     And stdout contains "pkm-002"
 
-  Scenario: future-deferred issues are hidden by default and marked via --all
+  Scenario: future-deferred issues are always visible with a [defer ...] suffix; --all only adds done
     Given the file "<vault>/issues/pkm-001.md" is written with:
       """
       ---
@@ -209,7 +209,7 @@ Feature: List issues
     When I run `mt list --vault <vault>`
     Then the exit code is 0
     And stdout contains "pkm-001"
-    And stdout does not contain "pkm-002"
+    And stdout contains "pkm-002  deferred future [defer 06-15 14:30]"
     And stdout contains "pkm-003"
     When I run `mt list --vault <vault> --all`
     Then the exit code is 0

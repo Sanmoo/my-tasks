@@ -360,7 +360,7 @@ Feature: Issue dependencies (blocked_by)
     And stderr contains "blocked_by cycle"
     And stderr contains "pkm-001 -> pkm-002 -> pkm-001"
 
-  Scenario: a blocked and future-deferred Issue shows both suffixes with --all
+  Scenario: a blocked and future-deferred Issue shows both suffixes in list, with and without --all
     Given the file "<vault>/issues/pkm-001.md" is written with:
       """
       ---
@@ -389,6 +389,9 @@ Feature: Issue dependencies (blocked_by)
       ## Notes
       ## Comments
       """
+    When I run `mt list --vault <vault>`
+    Then the exit code is 0
+    And stdout contains "pkm-002  deferred and blocked [defer 01-01 00:00] [blocked]"
     When I run `mt list --vault <vault> --all`
     Then the exit code is 0
     And stdout contains "pkm-002  deferred and blocked [defer 01-01 00:00] [blocked]"

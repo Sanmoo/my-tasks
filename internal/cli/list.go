@@ -17,9 +17,9 @@ import (
 )
 
 // newListCmd builds `mt list`: issues in priority order (rank → backlog
-// by created_at → id), one glyph per status, done and future-deferred
-// hidden by default (--all reveals them, future-deferred marked with a
-// [defer ...] suffix), filterable by --status and --label.
+// by created_at → id), one glyph per status, done hidden by default
+// (--all reveals them), future-deferred always shown and marked with a
+// [defer ...] suffix, filterable by --status and --label.
 func newListCmd() *cobra.Command {
 	var all bool
 	var statusFilter string
@@ -38,7 +38,7 @@ func newListCmd() *cobra.Command {
 			return runList(cmd, all, statusFilter, labelFilters)
 		},
 	}
-	cmd.Flags().BoolVar(&all, "all", false, "show done and future-deferred issues (deferred marked with a suffix)")
+	cmd.Flags().BoolVar(&all, "all", false, "also show done issues (future-deferred are always shown, marked with a suffix)")
 	cmd.Flags().StringVar(&statusFilter, "status", "", "only issues with this status")
 	cmd.Flags().StringArrayVar(&labelFilters, "label", nil, "only issues with this label; repeatable")
 	return cmd
@@ -71,10 +71,8 @@ func runList(cmd *cobra.Command, all bool, statusFilter string, labelFilters []s
 			continue
 		}
 		line := formatListLine(it)
-		if all {
-			if suffix := list.DeferSuffix(it.Issue.Frontmatter.DeferredUntil, now); suffix != "" {
-				line += " " + suffix
-			}
+		if suffix := list.DeferSuffix(it.Issue.Frontmatter.DeferredUntil, now); suffix != "" {
+			line += " " + suffix
 		}
 		if list.Blocked(it.Issue.Frontmatter.BlockedBy, statusByID) {
 			line += " [blocked]"
@@ -137,7 +135,7 @@ const listLong = `list prints the vault's issues in priority order:
 
 Each line is a status glyph (○ open, ◐ in_progress, ● done, ? for a
 custom status), the ID, and the title. Issues blocked by another
-non-done Issue carry a [blocked] suffix. done issues and issues deferred
-to the future are hidden by default; --all shows them, marking
-future-deferred issues with a [defer MM-DD HH:MM] suffix. Use --status
+non-done Issue carry a [blocked] suffix. Only done issues are hidden
+by default; --all shows them too. Issues deferred to the future are
+always shown, marked with a [defer MM-DD HH:MM] suffix. Use --status
 and --label to narrow the view.`

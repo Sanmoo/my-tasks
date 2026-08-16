@@ -442,6 +442,7 @@ func TestVisible(t *testing.T) {
 	custom := item("custom", "blocked", nil, "", "")
 	futureDeferred := item("future", "open", nil, "", "2026-08-20T08:00")
 	pastDeferred := item("past", "open", nil, "", "2026-08-10T08:00")
+	doneDeferred := item("doned", "done", nil, "", "2099-01-01T00:00")
 
 	cases := []struct {
 		name string
@@ -453,14 +454,16 @@ func TestVisible(t *testing.T) {
 		{"default shows in_progress", progress, list.Options{}, true},
 		{"default shows a custom status", custom, list.Options{}, true},
 		{"default hides done", done, list.Options{}, false},
-		{"default hides future-deferred", futureDeferred, list.Options{}, false},
+		{"default shows future-deferred", futureDeferred, list.Options{}, true},
 		{"default shows past-deferred (available)", pastDeferred, list.Options{}, true},
+		{"done hides even with a future deferral", doneDeferred, list.Options{}, false},
 		{"all shows done", done, list.Options{All: true}, true},
 		{"all shows future-deferred", futureDeferred, list.Options{All: true}, true},
+		{"all shows done even with a future deferral", doneDeferred, list.Options{All: true}, true},
 		{"status done shows done without all", done, list.Options{Status: "done"}, true},
 		{"status in_progress shows only it", progress, list.Options{Status: "in_progress"}, true},
 		{"status in_progress hides open", open, list.Options{Status: "in_progress"}, false},
-		{"status open still hides future-deferred", futureDeferred, list.Options{Status: "open"}, false},
+		{"status open shows future-deferred", futureDeferred, list.Options{Status: "open"}, true},
 		{"label matches", labeled("a", "open", []string{"compras"}, ""), list.Options{Labels: []string{"compras"}}, true},
 		{"label any-match", labeled("a", "open", []string{"saude"}, ""), list.Options{Labels: []string{"compras", "saude"}}, true},
 		{"label mismatch hides", labeled("a", "open", []string{"saude"}, ""), list.Options{Labels: []string{"compras"}}, false},

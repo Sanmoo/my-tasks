@@ -10,8 +10,12 @@
 
 **Blocked by:** 10 — pick-next, 06 — Transições de Status
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `applyMutation` imprime `<id> is now <status>: <título>` (com as regras acima)
-- [ ] `pick-next.feature` e `status.feature` asseguram o título na saída
-- [ ] README atualizado
+- [x] `applyMutation` imprime `<id> is now <status>: <título>` (com as regras acima)
+- [x] `pick-next.feature` e `status.feature` asseguram o título na saída
+- [x] README atualizado
+
+### Implementado
+
+`applyMutation` (internal/cli/status.go) agora imprime via `transitionLine`: `<id> is now <status>` + `: <título>` quando a Issue tem título. Whitespace no título vira espaço único (`\r\n`/`\r`/`\n` → espaço, pontas podadas por `TrimSpace`) — linha de confirmação sempre única; título vazio/só-espaços mantém a saída anterior exata. O `dep` ficou inalterado (decisão Q5 do grilling). E2e: asserções com título em pick-next.feature (4), status.feature (2 + 2 cenários novos: título só-espaços e título multilinha) e dependency.feature (3); README com exemplo novo. `make check` verde (unit + e2e + coverage ≥90% + mutation 97.3%). Revisado por /code-review (Standards sem violações; Spec conforme; achados tratados: Replacer `\r`, vacua negativa removida, ticket resolvido).

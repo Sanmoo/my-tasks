@@ -4,7 +4,8 @@ Feature: Defer issues
   accepts an absolute YY-MM-DD HH:MM (the hour is kept, not truncated)
   and relative durations (+2d, +1w, +3h) computed from now. A deferred
   Issue disappears from list until now >= deferred_until, then reappears
-  on its own — there is no "undefer". The datetime parsing is
+  on its own; when the deferral is expired, mt undefer archives the
+  reminder. The datetime parsing is
   decision-dense pure logic covered at Seam 2 (internal/deferral); these
   scenarios cover the process: the compiled binary against a temporary
   Vault.

@@ -10,3 +10,13 @@ func (i Issue) Defer(until string) Issue {
 	i.Frontmatter.DeferredUntil = until
 	return i
 }
+
+// Undefer returns i with its deferred_until cleared, archiving the
+// reminder. It is the pair of Defer: the Issue is back in normal
+// circulation immediately (availability is computed from the clock, see
+// internal/list). Only DeferredUntil is touched — Status and Rank stay
+// exactly as they are; undefer has no opinion on priority or state.
+func (i Issue) Undefer() Issue {
+	i.Frontmatter.DeferredUntil = ""
+	return i
+}

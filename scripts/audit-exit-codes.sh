@@ -80,6 +80,14 @@ run defer "$ID1" "26-08-20 08:00"
 run defer "$ID1" banana
 run defer "$ID1"
 
+label "undefer"
+run defer "$ID1" 99-01-01 00:00
+run undefer
+run undefer "$ID1"
+run undefer "$ID1"
+run undefer "$ID1" extra
+run undefer nope
+
 label "dep"
 ID2=$("$MT" q "second issue" | tr -d '[:space:]')
 run dep

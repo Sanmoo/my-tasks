@@ -88,11 +88,12 @@ Resumo:
 | `mt reopen <id>` | reabre (limpa `completed_at` e `started_at`) |
 | `mt status <id> <status>` | transição livre de status |
 | `mt defer <id> <quando>` | adia a Issue até uma data/hora |
+| `mt undefer [id]` | limpa `deferred_until` (todas as expiradas, ou uma Issue) |
 | `mt dep add <id> <bloqueador>` / `mt dep rm <id> <bloqueador>` | registra/remove dependência (`blocked_by`) |
 | `mt comment <id> <texto>` | anexa um comentário com timestamp |
 | `mt list` | lista na ordem de prioridade |
 | `mt ready` | lista as Issues disponíveis agora |
-| `mt overdue` | lista as Issues com Deadline estourado |
+| `mt overdue` | atenção temporal: Deferrais expiradas, depois Deadlines estourados |
 | `mt pick-next` | inicia a próxima Issue disponível |
 | `mt prioritize` | prioriza no `$EDITOR` (fila × Backlog) |
 | `mt top <id>` / `mt bottom <id>` | move para a primeira/última posição da fila |
@@ -174,13 +175,28 @@ com `status`. Só `done` (terminal, carimba `completed_at`) e `pick-next`
 ### `mt defer <id> <quando>`
 
 Adia a Issue até `deferred_until`, deixando-a `open` mas indisponível — ela
-volta a ficar disponível sozinha quando `now >= deferred_until`; não existe
-"undefer". O horário é preservado.
+volta a ficar disponível sozinha quando `now >= deferred_until` (a Deferral
+expira). Para arquivar o lembrete, use `mt undefer`. O horário é preservado.
 
 ```sh
 mt defer pkm-055 "26-08-20 08:00"    # absoluto: YY-MM-DD HH:MM (hora importa)
 mt defer pkm-055 +2d                  # relativo: +2d, +1w, +3h
 # → pkm-055 deferred until 2026-08-20T08:00
+```
+
+### `mt undefer [id]`
+
+Arquiva o lembrete de uma Deferral, limpando só o campo `deferred_until`:
+Status e Rank ficam intocados. Sem ID, varre o Vault limpando todas as
+Deferrais expiradas e imprime `Undeferred <id> (was <datetime>)` por Issue
+(zero expiradas = saída vazia, exit 0). Com um ID, limpa uma Issue
+específica mesmo com Deferral ainda futura — você mudou de ideia; uma Issue
+sem `deferred_until` falha com exit 1.
+
+```sh
+mt undefer                 # limpa todas as Deferrais expiradas
+mt undefer pkm-055         # limpa só essa (mesmo se futura)
+# → Undeferred pkm-055 (was 2026-08-20T08:00)
 ```
 
 ### `mt dep add <id> <bloqueador>` | `mt dep rm <id> <bloqueador>`
@@ -255,11 +271,17 @@ e `?` para status customizados.
 
 - `ready` — as Issues `open` e disponíveis agora (`now >= deferred_until` e
   nenhum bloqueador não-`done`), na ordem de prioridade de `list`;
-- `overdue` — as Issues não-`done` com `deadline` no passado. O Deadline é
-  informativo: não bloqueia nada, só aparece aqui.
+- `overdue` — o comando de **atenção temporal**: primeiro as Issues com
+  Deferral expirada (sufixo `[expirada MM-DD]`), depois as Issues não-`done`
+  com `deadline` no passado (sufixo `[deadline MM-DD]`). Cada grupo segue a
+  ordem de prioridade de `list`; uma Issue com os dois sinais aparece uma
+  única vez, no grupo das expiradas. Issues `done` ficam de fora; Issues
+  blocked aparecem mesmo assim. O Deadline é informativo: não bloqueia nada,
+  só aparece aqui.
 
 Ambas respeitam o formato de linha de `list`; sem correspondências, a saída
-é vazia com exit 0.
+é vazia com exit 0. O fluxo diário: `mt overdue` → agir ou re-deferir →
+`mt undefer`.
 
 ### `mt pick-next`
 

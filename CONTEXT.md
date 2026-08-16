@@ -25,8 +25,12 @@ O conjunto de issues sem rank, abaixo da fila priorizada. É onde as ideias vive
 _Avoid_: normal, não-priorizadas
 
 **Deferred until**:
-Data e hora a partir da qual uma issue fica disponível. Antes disso, a issue permanece `open` mas é indisponível para `pick-next`.
+Data e hora a partir da qual uma issue fica disponível. Antes disso, a issue permanece `open` mas é indisponível para `pick-next`. Quando `now >= deferred_until`, a Deferral está expirada e a issue volta ao convívio normal por conta própria.
 _Avoid_: snooze, adiamento, defer-como-status
+
+**Deferral expirada**:
+Uma Deferred until cuja data/hora chegou (`now >= deferred_until`). É o sinal primário de `mt overdue` e o alvo do `mt undefer` em lote — o lembrete que o usuário agendou chegou, e `undefer` arquiva o lembrete limpando o campo.
+_Avoid_: vencida, acordou, lembrete-como-estado
 
 **Deadline**:
 Data e hora limite de uma issue. Informativo; quando ultrapassado, a issue aparece em `overdue`.

@@ -127,6 +127,59 @@ func Overdue(item Item, now time.Time) bool {
 	return ok && deadline.Before(now) && item.Issue.Frontmatter.Status != "done"
 }
 
+// DeferralExpired reports whether deferredUntil is a datetime whose time
+// has arrived: now >= deferred_until. It is the mirror of IsFutureDeferred.
+// An empty or malformed value is not an expired deferral (format
+// validation is mt check's).
+func DeferralExpired(deferredUntil string, now time.Time) bool {
+	t, ok := parseNaive(deferredUntil)
+	return ok && !t.After(now)
+}
+
+// ExpiredSuffix returns the "[expirada MM-DD]" marker for a
+// deferred_until datetime whose time has arrived relative to now. It
+// returns "" when deferredUntil is empty, still in the future, or
+// malformed.
+func ExpiredSuffix(deferredUntil string, now time.Time) string {
+	t, ok := parseNaive(deferredUntil)
+	if !ok || t.After(now) {
+		return ""
+	}
+	return "[expirada " + t.Format("01-02") + "]"
+}
+
+// DeadlineSuffix returns the "[deadline MM-DD]" marker for a deadline
+// that has passed relative to now. It returns "" when deadline is empty,
+// not yet passed, or malformed.
+func DeadlineSuffix(deadline string, now time.Time) string {
+	t, ok := parseNaive(deadline)
+	if !ok || !t.Before(now) {
+		return ""
+	}
+	return "[deadline " + t.Format("01-02") + "]"
+}
+
+// OverdueGroups partitions items into the two groups of the overdue
+// temporal-attention view: items whose deferral has expired first, then
+// items whose deadline has passed. Only non-done Items participate; an
+// Item with both signals appears once, in the expired group. The input
+// order (the vault's Rank order) is preserved within each group.
+func OverdueGroups(items []Item, now time.Time) (expired, late []Item) {
+	for _, it := range items {
+		if it.Issue.Frontmatter.Status == "done" {
+			continue
+		}
+		if DeferralExpired(it.Issue.Frontmatter.DeferredUntil, now) {
+			expired = append(expired, it)
+			continue
+		}
+		if Overdue(it, now) {
+			late = append(late, it)
+		}
+	}
+	return expired, late
+}
+
 // DeferSuffix returns the "[defer MM-DD HH:MM]" marker for a
 // deferred_until datetime in the future relative to now. It returns ""
 // when deferredUntil is empty, not in the future, or malformed.

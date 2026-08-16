@@ -18,7 +18,8 @@ import (
 
 // newDeferCmd builds `mt defer <id> <when>`: sets deferred_until on the
 // Issue and leaves it open. The Issue simply becomes unavailable until
-// the time arrives — there is no "undefer".
+// the time arrives; once it does (the Deferral is expired), `mt undefer`
+// archives the reminder.
 func newDeferCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "defer <id> <when>",
@@ -62,8 +63,8 @@ func runDefer(cmd *cobra.Command, id, when string) error {
 
 const deferLong = `defer sets an Issue's deferred_until and leaves it open:
 the Issue simply becomes unavailable until the moment
-arrives (now >= deferred_until), then reappears on its own — there is
-no "undefer".
+arrives (now >= deferred_until), then reappears on its own; once the
+deferral is expired, mt undefer archives the reminder.
 
 The time is either an absolute local datetime in YY-MM-DD HH:MM form
 (e.g. 26-08-20 08:00 — the hour is kept) or a relative duration from

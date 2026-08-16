@@ -250,6 +250,189 @@ func TestDeferSuffix(t *testing.T) {
 	}
 }
 
+func TestDeferralExpired(t *testing.T) {
+	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
+	cases := []struct {
+		name     string
+		deferred string
+		want     bool
+	}{
+		{"empty is not expired", "", false},
+		{"malformed is not expired", "not-a-date", false},
+		{"past is expired", "2026-08-10T08:00", true},
+		{"exactly now is expired", "2026-08-15T12:00", true},
+		{"future is not expired", "2026-08-20T08:00", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := list.DeferralExpired(c.deferred, now); got != c.want {
+				t.Errorf("DeferralExpired(%q, now) = %t, want %t", c.deferred, got, c.want)
+			}
+		})
+	}
+}
+
+func TestExpiredSuffix(t *testing.T) {
+	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
+	cases := []struct {
+		name     string
+		deferred string
+		want     string
+	}{
+		{"empty has no suffix", "", ""},
+		{"malformed has no suffix", "garbage", ""},
+		{"future has no suffix", "2026-08-20T08:00", ""},
+		{"exactly now gets an expired suffix", "2026-08-15T12:00", "[expirada 08-15]"},
+		{"past gets an expired suffix", "2026-08-10T08:00", "[expirada 08-10]"},
+		{"suffix zero-pads month and day", "2026-03-05T04:06", "[expirada 03-05]"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := list.ExpiredSuffix(c.deferred, now); got != c.want {
+				t.Errorf("ExpiredSuffix(%q, now) = %q, want %q", c.deferred, got, c.want)
+			}
+		})
+	}
+}
+
+func TestDeadlineSuffix(t *testing.T) {
+	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
+	cases := []struct {
+		name     string
+		deadline string
+		want     string
+	}{
+		{"empty has no suffix", "", ""},
+		{"malformed has no suffix", "garbage", ""},
+		{"future has no suffix", "2026-08-20T08:00", ""},
+		{"exactly now has no suffix", "2026-08-15T12:00", ""},
+		{"past gets a deadline suffix", "2026-08-10T08:00", "[deadline 08-10]"},
+		{"suffix zero-pads month and day", "2026-03-05T04:06", "[deadline 03-05]"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := list.DeadlineSuffix(c.deadline, now); got != c.want {
+				t.Errorf("DeadlineSuffix(%q, now) = %q, want %q", c.deadline, got, c.want)
+			}
+		})
+	}
+}
+
+// overdueItem builds an item with a deadline and an optional
+// deferred_until, for the OverdueGroups tests.
+func overdueItem(id, status, deadline, deferredUntil string) list.Item {
+	it := item(id, status, nil, "", deferredUntil)
+	it.Issue.Frontmatter.Deadline = deadline
+	return it
+}
+
+func TestOverdueGroups(t *testing.T) {
+	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
+	expired := "2026-08-10T08:00"
+	future := "2026-08-20T08:00"
+
+	t.Run("partitions expired deferrals and passed deadlines", func(t *testing.T) {
+		items := []list.Item{
+			overdueItem("late", "open", expired, ""),
+			overdueItem("expired", "open", "", expired),
+			overdueItem("quiet", "open", "", ""),
+		}
+		exp, late := list.OverdueGroups(items, now)
+		if got := ids(exp); !slices.Equal(got, []string{"expired"}) {
+			t.Errorf("expired group = %v, want [expired]", got)
+		}
+		if got := ids(late); !slices.Equal(got, []string{"late"}) {
+			t.Errorf("late group = %v, want [late]", got)
+		}
+	})
+
+	t.Run("both signals appear once in the expired group", func(t *testing.T) {
+		items := []list.Item{
+			overdueItem("both", "open", expired, expired),
+		}
+		exp, late := list.OverdueGroups(items, now)
+		if got := ids(exp); !slices.Equal(got, []string{"both"}) {
+			t.Errorf("expired group = %v, want [both]", got)
+		}
+		if len(late) != 0 {
+			t.Errorf("late group = %v, want empty", ids(late))
+		}
+	})
+
+	t.Run("done is excluded from both groups", func(t *testing.T) {
+		items := []list.Item{
+			overdueItem("done", "done", expired, expired),
+			overdueItem("open", "open", expired, ""),
+		}
+		exp, late := list.OverdueGroups(items, now)
+		if len(exp) != 0 {
+			t.Errorf("expired group = %v, want empty", ids(exp))
+		}
+		if got := ids(late); !slices.Equal(got, []string{"open"}) {
+			t.Errorf("late group = %v, want [open]", got)
+		}
+	})
+
+	t.Run("in_progress participates", func(t *testing.T) {
+		items := []list.Item{
+			overdueItem("progress", "in_progress", "", expired),
+		}
+		exp, late := list.OverdueGroups(items, now)
+		if got := ids(exp); !slices.Equal(got, []string{"progress"}) {
+			t.Errorf("expired group = %v, want [progress]", got)
+		}
+		if len(late) != 0 {
+			t.Errorf("late group = %v, want empty", ids(late))
+		}
+	})
+
+	t.Run("preserves input order within each group", func(t *testing.T) {
+		items := []list.Item{
+			overdueItem("late-2", "open", expired, ""),
+			overdueItem("expired-2", "open", "", expired),
+			overdueItem("late-1", "open", expired, ""),
+			overdueItem("expired-1", "open", "", expired),
+		}
+		exp, late := list.OverdueGroups(items, now)
+		if got := ids(exp); !slices.Equal(got, []string{"expired-2", "expired-1"}) {
+			t.Errorf("expired group = %v, want input order", got)
+		}
+		if got := ids(late); !slices.Equal(got, []string{"late-2", "late-1"}) {
+			t.Errorf("late group = %v, want input order", got)
+		}
+	})
+
+	t.Run("empty input gives empty groups", func(t *testing.T) {
+		exp, late := list.OverdueGroups(nil, now)
+		if len(exp) != 0 || len(late) != 0 {
+			t.Errorf("groups = (%v, %v), want empty", ids(exp), ids(late))
+		}
+	})
+
+	t.Run("future deferral with passed deadline is late", func(t *testing.T) {
+		items := []list.Item{
+			overdueItem("later", "open", expired, future),
+		}
+		exp, late := list.OverdueGroups(items, now)
+		if len(exp) != 0 {
+			t.Errorf("expired group = %v, want empty", ids(exp))
+		}
+		if got := ids(late); !slices.Equal(got, []string{"later"}) {
+			t.Errorf("late group = %v, want [later]", got)
+		}
+	})
+
+	t.Run("malformed values participate in no group", func(t *testing.T) {
+		items := []list.Item{
+			overdueItem("bad", "open", "garbage", "garbage"),
+		}
+		exp, late := list.OverdueGroups(items, now)
+		if len(exp) != 0 || len(late) != 0 {
+			t.Errorf("groups = (%v, %v), want empty", ids(exp), ids(late))
+		}
+	})
+}
+
 func TestVisible(t *testing.T) {
 	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
 

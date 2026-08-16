@@ -20,12 +20,55 @@ func newReadyCmd() *cobra.Command {
 	})
 }
 
-// newOverdueCmd builds `mt overdue`, which lists non-done Issues whose
-// informational Deadline has passed.
+// newOverdueCmd builds `mt overdue`, the vault's temporal-attention
+// command: expired deferrals first (marked [expirada MM-DD]), then
+// passed deadlines (marked [deadline MM-DD]), each group in the vault's
+// priority order. The two-group output needs its own runner, unlike the
+// single-predicate queries of newIssueQueryCmd.
 func newOverdueCmd() *cobra.Command {
-	return newIssueQueryCmd("overdue", "List non-done Issues with a passed Deadline", func(item list.Item, now time.Time, _ map[string]string) bool {
-		return list.Overdue(item, now)
-	})
+	return &cobra.Command{
+		Use:   "overdue",
+		Short: "List Issues needing temporal attention (expired deferrals, passed deadlines)",
+		Args: func(_ *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				return exitcode.Usage(fmt.Errorf("overdue takes no arguments"))
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runOverdue(cmd)
+		},
+	}
+}
+
+// runOverdue loads and orders all Issues, then prints the two temporal
+// groups: expired deferrals first, then passed deadlines, each line
+// marked with the reason it is there. An Issue with both signals appears
+// only in the expired group; done Issues appear in neither. It
+// intentionally does not warn about duplicate ranks, like the other
+// focused query views.
+func runOverdue(cmd *cobra.Command) error {
+	vaultDir, err := resolveVault(cmd)
+	if err != nil {
+		return err
+	}
+	items, err := loadSortedItems(vaultDir)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now()
+	expired, late := list.OverdueGroups(items, now)
+	out := cmd.OutOrStdout()
+	for _, it := range expired {
+		line := formatListLine(it) + " " + list.ExpiredSuffix(it.Issue.Frontmatter.DeferredUntil, now)
+		fmt.Fprintln(out, line)
+	}
+	for _, it := range late {
+		line := formatListLine(it) + " " + list.DeadlineSuffix(it.Issue.Frontmatter.Deadline, now)
+		fmt.Fprintln(out, line)
+	}
+	return nil
 }
 
 // newIssueQueryCmd builds a read-only query command over a vault's Issues.

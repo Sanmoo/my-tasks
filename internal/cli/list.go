@@ -67,7 +67,7 @@ func runList(cmd *cobra.Command, all bool, statusFilter string, labelFilters []s
 	opts := list.Options{All: all, Status: statusFilter, Labels: labelFilters}
 	statusByID := list.StatusByID(items)
 	for _, it := range items {
-		if !list.Visible(it, opts, now) {
+		if !list.Visible(it, opts) {
 			continue
 		}
 		line := formatListLine(it)

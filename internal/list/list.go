@@ -217,9 +217,12 @@ func Blocked(blockedBy []string, statusByID map[string]string) bool {
 }
 
 // Options selects the issues a list view shows.
+//
+// All reveals done issues; without it, done issues are hidden. A future
+// deferral never hides an issue: the [defer ...] suffix marks it.
 type Options struct {
-	// All reveals done issues and future-deferred issues (the latter
-	// marked with DeferSuffix).
+	// All reveals done issues (future-deferred issues are always
+	// shown, marked with DeferSuffix).
 	All bool
 	// Status narrows to a single status when non-empty. An explicit
 	// Status overrides the default hiding of done: --status done shows
@@ -230,12 +233,12 @@ type Options struct {
 	Labels []string
 }
 
-// Visible reports whether item appears in a list view under opts at time
-// now. done issues are hidden unless opts.All or an explicit opts.Status
-// asks for them; a future deferral does not hide an issue (the [defer ...]
+// Visible reports whether item appears in a list view under opts. done
+// issues are hidden unless opts.All or an explicit opts.Status asks for
+// them; a future deferral does not hide an issue (the [defer ...]
 // suffix signals its unavailability); opts.Labels narrow the view to
 // issues carrying at least one of the labels.
-func Visible(item Item, opts Options, now time.Time) bool {
+func Visible(item Item, opts Options) bool {
 	fm := item.Issue.Frontmatter
 	if opts.Status != "" {
 		if fm.Status != opts.Status {

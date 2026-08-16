@@ -434,8 +434,6 @@ func TestOverdueGroups(t *testing.T) {
 }
 
 func TestVisible(t *testing.T) {
-	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
-
 	open := item("open", "open", nil, "", "")
 	progress := item("progress", "in_progress", nil, "", "")
 	done := item("done", "done", nil, "", "")
@@ -471,7 +469,7 @@ func TestVisible(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := list.Visible(c.it, c.opts, now); got != c.want {
+			if got := list.Visible(c.it, c.opts); got != c.want {
 				t.Errorf("Visible(%s) = %t, want %t", c.name, got, c.want)
 			}
 		})

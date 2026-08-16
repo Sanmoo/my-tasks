@@ -29,7 +29,7 @@ Um CLI em Go de binário único, `mt`, que opera sobre Vaults: diretórios com u
 15. As a usuário, quero que `mt list` mostre as issues na ordem de prioridade (rank → backlog por `created_at`), para ver o que importa primeiro.
 16. As a usuário, quero glyphs de status (○/◐/●) na listagem, para bater o olho e saber o estado de cada issue.
 17. As a usuário, quero que `list` esconda `done` por padrão (com `--all` para ver tudo), para manter o foco no que está vivo.
-18. As a usuário, quero que `list` esconda issues com Deferred until no futuro (com sufixo `[defer ...]` visível via `--all`), para não ver trabalho que ainda não está disponível.
+18. As a usuário, quero que `list` mostre issues com Deferred until no futuro (sufixo `[defer ...]` sempre visível), para não esquecer do trabalho que ainda não está disponível.
 19. As a usuário, quero filtrar por `--status` e `--label`, para recortar o vault.
 20. As a usuário, quero ver uma issue completa (`mt show`), frontmatter + corpo + comentários, para ler todo o contexto de uma vez.
 21. As a usuário, quero editar o arquivo via `mt edit` ($EDITOR), para ajustes livres preservando o resto do documento.
@@ -38,7 +38,7 @@ Um CLI em Go de binário único, `mt`, que opera sobre Vaults: diretórios com u
 24. As a usuário, quero usar `mt close` como alias de `done`, para digitar o que vier à cabeça.
 25. As a usuário, quero reabrir com `mt reopen` (limpando `completed_at` e `started_at`), para corrigir fechamentos prematuros.
 26. As a usuário, quero transitar livremente entre status com `mt status <id> <status>` (sem máquina de estados), para que só `pick-next`→`in_progress` e `done` terminal tenham comportamento especial.
-27. As a usuário, quero adiar com `mt defer <id> <quando>` aceitando `YY-MM-DD HH:MM`, para esconder trabalho até o momento certo — **com hora**.
+27. As a usuário, quero adiar com `mt defer <id> <quando>` aceitando `YY-MM-DD HH:MM`, para tirar trabalho da fila acionável até o momento certo — **com hora**.
 28. As a usuário, quero deferir com prazos relativos (`+2d`, `+1w`, `+3h`), para adiar sem calcular datas.
 29. As a usuário, quero que a issue deferida continue `open` mas indisponível, para que deferral seja dado, não estado.
 30. As a usuário, quero que a issue deferida volte a ficar disponível sozinha quando `now >= deferred_until`, para não existir operação de "undefer".
@@ -135,7 +135,7 @@ status: [open, in_progress, done]
 Inclui issues `open` e `in_progress`. Reordenar `[P]` muda a ordem; trocar `[ ]`↔`[P]` entra/sai da fila. Conteúdo inválido (ID inexistente/duplicado) → erro, nada é aplicado. Apply **in-process** (requisito de performance — a dor original era N subprocessos `nd update`).
 
 - **`pick-next`:** candidatos = `open` + disponível; ordem: menor rank → mais antigo do Backlog por `created_at` → `id`. Seta `in_progress` + `started_at`. Sem candidatos: stderr + exit 1. Rank duplicado: recusa, exit 1. Sem WIP limit.
-- **`list`:** glyphs ○ (`open`), ◐ (`in_progress`), ● (`done`), fallback para custom; ordem rank → Backlog por `created_at`; esconde `done` e deferidas-futuras (sufixo `[defer MM-DD HH:MM]`); `--all`, `--status`, `--label`.
+- **`list`:** glyphs ○ (`open`), ◐ (`in_progress`), ● (`done`), fallback para custom; ordem rank → Backlog por `created_at`; esconde só `done` (sufixo `[defer MM-DD HH:MM]` sempre visível nas deferidas-futuras); `--all` inclui `done`; `--status`, `--label`.
 - **Exit codes:** 0 sucesso; 1 erro de usuário (vault indefinido, nada disponível, rank duplicado, edição inválida); 2 erro de uso. Erros sempre em stderr.
 - **`check`:** valida rank duplicado (erro), lacuna (aviso), YAML/frontmatter malformado, status fora da config, formato de datetime; `--fix` renormaliza.
 

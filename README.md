@@ -254,12 +254,12 @@ linha é um glyph de status, o ID e o título:
 ○ pkm-003  ideia do backlog
 ```
 
-Issues `done` e adiadas para o futuro ficam ocultas por padrão. Issues
-bloqueadas (algum ID de `blocked_by` não está `done`) ficam visíveis com
-sufixo `[blocked]` — com `--all`, o sufixo de adiamento e o `[blocked]`
-aparecem juntos. Flags:
+Apenas Issues `done` ficam ocultas por padrão; adiadas para o futuro ficam
+visíveis, com sufixo `[defer MM-DD HH:MM]`. Issues bloqueadas (algum ID de
+`blocked_by` não está `done`) ficam visíveis com sufixo `[blocked]` — os dois
+sufixos aparecem juntos quando a Issue é adiada e bloqueada. Flags:
 
-- `--all` — mostra `done` e adiadas; adiadas ganham sufixo `[defer MM-DD HH:MM]`;
+- `--all` — mostra também `done`;
 - `--status <s>` — filtra por status;
 - `--label <l>` — filtra por label, repetível.
 

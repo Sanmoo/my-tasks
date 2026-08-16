@@ -25,7 +25,7 @@ O conjunto de issues sem rank, abaixo da fila priorizada. É onde as ideias vive
 _Avoid_: normal, não-priorizadas
 
 **Deferred until**:
-Data e hora a partir da qual uma issue fica disponível. Antes disso, a issue permanece `open` mas é indisponível para `pick-next`. Quando `now >= deferred_until`, a Deferral está expirada e a issue volta ao convívio normal por conta própria.
+Data e hora a partir da qual uma issue fica disponível. Antes disso, a issue permanece `open` e continua **visível**, mas é **indisponível** para `pick-next` e `ready`. Quando `now >= deferred_until`, a Deferral está expirada e a issue volta a ficar disponível por conta própria.
 _Avoid_: snooze, adiamento, defer-como-status
 
 **Deferral expirada**:

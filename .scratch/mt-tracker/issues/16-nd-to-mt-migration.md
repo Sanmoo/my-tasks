@@ -6,11 +6,25 @@
 
 **Status:** ready-for-agent
 
-- [ ] Script lê vault nd vivo + sidecar (dry-run/apply, idempotente)
-- [ ] Tradução de status/datas conforme ADR-0005 (incl. `26-08-23` → `2026-08-23T00:00`)
-- [ ] `deadline` importado do sidecar (18 issues)
-- [ ] Comentários preservados byte a byte (marcadores beads mantidos)
-- [ ] IDs renomeados por domínio com reescrita de referências no corpo (mapa global, case normalizado)
-- [ ] Campos descartados removidos; `blocked_by` preservado
-- [ ] Relatório de auditoria gerado em `migration-artifacts/`
+- [x] Script lê vault nd vivo + sidecar (dry-run/apply, idempotente)
+- [x] Tradução de status/datas conforme ADR-0005 (incl. `26-08-23` → `2026-08-23T00:00`)
+- [x] `deadline` importado do sidecar (18 issues)
+- [x] Comentários preservados byte a byte (marcadores beads mantidos)
+- [x] IDs renomeados por domínio com reescrita de referências no corpo (mapa global, case normalizado)
+- [x] Campos descartados removidos; `blocked_by` preservado
+- [x] Relatório de auditoria gerado em `migration-artifacts/`
 - [ ] Cutover executado: backup do `nd/backlog`, `.vault` reorganizado, config global, `mt check` OK, filas re-priorizadas
+
+### Implementado (script, validado contra o vault vivo)
+
+`pkm-nd-migration/scripts/migrate-nd-to-mt.py` (+ entry `migrate-nd-to-mt.py`, + 49 testes em `test_migrate_nd_to_mt.py`): dry-run por padrão, `--apply` para escrever, idempotente (2ª execução: 0 escritas, configs reusadas). Aplicado no vault vivo: 233 issues → `bjd` 177, `dom` 29, `pes` 27; 18 deadlines do sidecar; 176 `closed→done` (+`completed_at`), 14 `deferred→open` (+`deferred_until` naive, `26-08-23`→`T00:00`; `pkm-wm4` sem data), 5 `in_progress` sem `started_at`, 4 `waiting` (só bjd); 39 referências reescritas em 16 issues; 9 ids `PKM-*` normalizados; corpos byte a byte (marcadores beads, linhas `Due:` históricas); labels `rank/*`/`area/*` descartados (história ambígua, ADR), `kind/*` e `status/someday` mantidos. `mt check` (binário buildado do `main`): **OK nos três vaults**. Relatório: `pkm-nd-migration/migration-artifacts/migration-audit.json`.
+
+### Code review (2 eixos, paralelos)
+
+- **Standards:** sem violações duras (campo canônico do frontmatter, mt.yaml, padrão dos scripts locais, vocabulário do CONTEXT). Três avisos corrigidos: `closed_at` ausente em issue `closed` agora é `ValueError` com contexto (era KeyError cru); `load_sidecar` valida shape do JSON (id + lista `issues`); labels não-lista agora falha alto. Julgamentos mantidos: reescrita também dentro de URLs/spans de código (só ids mapeados, auditado — o mapa global é o mandato do ADR); `WORD_ID_RE` genérico em vez de prefixo fixo (deixa ids desconhecidos intactos).
+- **Spec:** todos os itens verificados contra o vault vivo + sidecar. Nit corrigido: `defer_until` traduzido para `deferred_until` não é mais reportado como "descartado" no audit. Escopo extra deliberado (documentado): relatório de órfãos (nunca deleta), guarda de `blocked_by` entre vaults (falha alto; sem caso real), campos `related/led_to/follows/was_blocked_by` descartados (o mt os rejeitaria; regra geral do ADR).
+- Verificação final: 49 testes OK, `ruff check` limpo, audit JSON válido, `mt check` OK em bjd/dom/pes, corpo de 233/233 issues idêntico ao fonte exceto reescritas.
+
+### Cutover pendente (humano)
+
+Ordem (per ticket + ADR-0005): último `nd sync` → tag de backup do `nd/backlog` → remover `.nd.yaml` e ajustar o `.gitignore` do `.vault` (issues voltam a ser trackeadas no `main`) → **reinstalar o `mt`** (`~/bin/mt` atual é build pré-ticket-15 e rejeita `blocked_by`) → config global com `@bjd/@dom/@pes` + padrão → `mt check` nos três vaults → uma passada de `mt prioritize` por vault (tudo migrou para o Backlog). Os três vaults já existem em `pkm/.vault/{bjd,dom,pes}` e passam no `mt check` hoje.

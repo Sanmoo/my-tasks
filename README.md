@@ -288,13 +288,15 @@ Ambas respeitam o formato de linha de `list`; sem correspondências, a saída
 Inicia a próxima Issue disponível: a `open` de menor Rank; sem Issues
 rankeadas, a mais antiga do Backlog (desempate por ID). Adiadas para o
 futuro e bloqueadas (algum bloqueador não-`done`) são puladas. A Issue
-escolhida vira `in_progress` e recebe `started_at`. Várias Issues
-`in_progress` simultâneas são permitidas.
+escolhida vira `in_progress`, recebe `started_at` e a confirmação mostra o
+título (como em `status`/`done`):
 
 ```sh
 mt pick-next
-# → pkm-002 is now in_progress
+# → pkm-002 is now in_progress: rank one
 ```
+
+Várias Issues `in_progress` simultâneas são permitidas.
 
 Sem nada disponível: mensagem clara no stderr e exit 1. Rank duplicado no
 vault: recusa com erro (a ambiguidade nunca é resolvida no chute).

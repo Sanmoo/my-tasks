@@ -54,18 +54,18 @@ Feature: Issue dependencies (blocked_by)
     And stdout does not contain "pkm-002"
     When I run `mt pick-next --vault <vault>`
     Then the exit code is 0
-    And stdout contains "pkm-001 is now in_progress"
+    And stdout contains "pkm-001 is now in_progress: blocker"
     And the file "<vault>/issues/pkm-002.md" contains "status: open"
     When I run `mt done --vault <vault> pkm-001`
     Then the exit code is 0
-    And stdout contains "pkm-001 is now done"
+    And stdout contains "pkm-001 is now done: blocker"
     When I run `mt list --vault <vault>`
     Then the exit code is 0
     And stdout contains "pkm-002  dependent"
     And stdout does not contain "[blocked]"
     When I run `mt pick-next --vault <vault>`
     Then the exit code is 0
-    And stdout contains "pkm-002 is now in_progress"
+    And stdout contains "pkm-002 is now in_progress: dependent"
 
   Scenario: a blocker being done unblocks without an explicit operation
     Given the file "<vault>/issues/pkm-001.md" is written with:

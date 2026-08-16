@@ -106,14 +106,27 @@ func runMutation(cmd *cobra.Command, id string, mutate func(issue.Issue) issue.I
 }
 
 // applyMutation applies and persists a mutation, then prints the new
-// status. It is the shared tail of done, reopen and status.
+// status — with the Issue's title when it has one. It is the shared
+// tail of done, reopen, status and pick-next.
 func applyMutation(cmd *cobra.Command, vaultDir, id string, mutate func(issue.Issue) issue.Issue) error {
 	i, err := mutateIssue(vaultDir, id, mutate)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "%s is now %s\n", id, i.Frontmatter.Status)
+	fmt.Fprintln(cmd.OutOrStdout(), transitionLine(id, i))
 	return nil
+}
+
+// transitionLine renders the transition confirmation for id: "id is now
+// status", plus ": title" when the Issue has a title. Whitespace runs in
+// the title become single spaces so the confirmation stays a single line,
+// and a blank title keeps the line exactly as before.
+func transitionLine(id string, i issue.Issue) string {
+	line := fmt.Sprintf("%s is now %s", id, i.Frontmatter.Status)
+	if t := strings.TrimSpace(strings.NewReplacer("\r\n", " ", "\r", " ", "\n", " ").Replace(i.Frontmatter.Title)); t != "" {
+		line += ": " + t
+	}
+	return line
 }
 
 // mutateIssue loads the Issue for id, applies mutate and persists the

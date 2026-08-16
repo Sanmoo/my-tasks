@@ -52,7 +52,7 @@ Feature: Pick the next Issue
       """
     When I run `mt pick-next --vault <vault>`
     Then the exit code is 0
-    And stdout contains "pkm-002 is now in_progress"
+    And stdout contains "pkm-002 is now in_progress: rank one"
     And the file "<vault>/issues/pkm-002.md" contains "status: in_progress"
     And the file "<vault>/issues/pkm-002.md" matches "started_at: [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}"
     And the file "<vault>/issues/pkm-001.md" contains "status: open"
@@ -113,7 +113,7 @@ Feature: Pick the next Issue
       """
     When I run `mt pick-next --vault <vault>`
     Then the exit code is 0
-    And stdout contains "pkm-002 is now in_progress"
+    And stdout contains "pkm-002 is now in_progress: backlog by id"
     And the file "<vault>/issues/pkm-002.md" contains "status: in_progress"
     And the file "<vault>/issues/pkm-010.md" contains "status: open"
 
@@ -149,7 +149,7 @@ Feature: Pick the next Issue
       """
     When I run `mt pick-next --vault <vault>`
     Then the exit code is 0
-    And stdout contains "pkm-002 is now in_progress"
+    And stdout contains "pkm-002 is now in_progress: available second rank"
     And the file "<vault>/issues/pkm-001.md" contains "status: open"
     And the file "<vault>/issues/pkm-002.md" contains "status: in_progress"
 
@@ -263,6 +263,6 @@ Feature: Pick the next Issue
       """
     When I run `mt pick-next --vault <vault>`
     Then the exit code is 0
-    And stdout contains "pkm-002 is now in_progress"
+    And stdout contains "pkm-002 is now in_progress: next issue"
     And the file "<vault>/issues/pkm-001.md" contains "status: in_progress"
     And the file "<vault>/issues/pkm-002.md" contains "status: in_progress"

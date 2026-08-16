@@ -18,7 +18,7 @@ Feature: Status transitions
     And I remember the issue ID
     When I run `mt done --vault <vault> <id>`
     Then the exit code is 0
-    And stdout contains "<id> is now done"
+    And stdout contains "<id> is now done: comprar material"
     And the file "<vault>/issues/<id>.md" contains "status: done"
     And the file "<vault>/issues/<id>.md" matches "completed_at: [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}"
 
@@ -28,7 +28,7 @@ Feature: Status transitions
     And I remember the issue ID
     When I run `mt close --vault <vault> <id>`
     Then the exit code is 0
-    And stdout contains "<id> is now done"
+    And stdout contains "<id> is now done: comprar material"
     And the file "<vault>/issues/<id>.md" contains "status: done"
     And the file "<vault>/issues/<id>.md" contains "completed_at:"
 
@@ -50,7 +50,7 @@ Feature: Status transitions
       """
     When I run `mt reopen --vault <vault> pkm-0001`
     Then the exit code is 0
-    And stdout contains "pkm-0001 is now open"
+    And stdout contains "pkm-0001 is now open: t"
     And the file "<vault>/issues/pkm-0001.md" contains "status: open"
     And the file "<vault>/issues/pkm-0001.md" does not contain "completed_at:"
     And the file "<vault>/issues/pkm-0001.md" does not contain "started_at:"
@@ -61,8 +61,47 @@ Feature: Status transitions
     And I remember the issue ID
     When I run `mt status --vault <vault> <id> in_progress`
     Then the exit code is 0
-    And stdout contains "<id> is now in_progress"
+    And stdout contains "<id> is now in_progress: t"
     And the file "<vault>/issues/<id>.md" contains "status: in_progress"
+
+  Scenario: status with an empty or blank title omits the title suffix
+    Given the file "<vault>/issues/pkm-0001.md" is written with:
+      """
+      ---
+      title: "   "
+      status: open
+      labels: []
+      created_at: 2026-08-15T09:30
+      ---
+
+      ## Description
+      ## Notes
+      ## Comments
+      """
+    When I run `mt status --vault <vault> pkm-0001 in_progress`
+    Then the exit code is 0
+    And stdout contains "pkm-0001 is now in_progress"
+    And stdout does not contain "is now in_progress: "
+    And the file "<vault>/issues/pkm-0001.md" contains "status: in_progress"
+
+  Scenario: status flattens newlines in the title
+    Given the file "<vault>/issues/pkm-0001.md" is written with:
+      """
+      ---
+      title: "linha um\nlinha dois"
+      status: open
+      labels: []
+      created_at: 2026-08-15T09:30
+      ---
+
+      ## Description
+      ## Notes
+      ## Comments
+      """
+    When I run `mt status --vault <vault> pkm-0001 in_progress`
+    Then the exit code is 0
+    And stdout contains "pkm-0001 is now in_progress: linha um linha dois"
+    And the file "<vault>/issues/pkm-0001.md" contains "status: in_progress"
 
   Scenario: status accepts a custom status from the vault config
     Given the file "<vault>/mt.yaml" is written with:

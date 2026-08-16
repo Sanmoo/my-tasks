@@ -82,7 +82,7 @@ Resumo:
 | `mt init [dir]` | cria um Vault (`issues/` + `mt.yaml`) |
 | `mt create <título>` | cria uma Issue |
 | `mt q <título>` | cria uma Issue e imprime só o ID |
-| `mt show <id>` | mostra a Issue completa (frontmatter + corpo) |
+| `mt show <id>` | mostra a Issue renderizada (header, metadados, corpo) |
 | `mt edit <id>` | abre a Issue no `$EDITOR` |
 | `mt done <id>` (alias `close`) | fecha a Issue (carimba `completed_at`) |
 | `mt reopen <id>` | reabre (limpa `completed_at` e `started_at`) |
@@ -142,10 +142,16 @@ mt q "anotar rápido"
 
 ### `mt show <id>` e `mt edit <id>`
 
-`show` imprime o arquivo da Issue exatamente como está — frontmatter, corpo
-e comentários. `edit` abre o arquivo no `$EDITOR` (split em whitespace, o
-caminho nunca passa por shell); qualquer edição é preservada, inclusive
-edições manuais do frontmatter.
+`show` renderiza a Issue como uma vista estruturada no estilo do `nd show`:
+linha de cabeçalho (glyph de status, ID, título em negrito, status
+colorido), metadados (Created, Labels e os opcionais só quando set) e o
+corpo Markdown renderizado (tema dark/light, wrap ≤ 100). A cor segue a
+convenção padrão: `NO_COLOR` desliga, `CLICOLOR=0` desliga,
+`CLICOLOR_FORCE` força, senão só quando stdout é TTY — em pipe a vista é a
+mesma, sem ANSI. O tema do corpo resolve de `MT_THEME=light|dark`, senão
+`COLORFGBG`, senão dark. `edit` abre o arquivo cru no `$EDITOR` (split em
+whitespace, o caminho nunca passa por shell); qualquer edição é preservada,
+inclusive edições manuais do frontmatter.
 
 ```sh
 mt show pkm-055

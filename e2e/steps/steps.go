@@ -38,16 +38,20 @@ type state struct {
 	result support.Result
 	// ran is true once a run has been recorded in this scenario.
 	ran bool
+	// extraEnv are additional environment variables for the following
+	// mt runs, set by the "the environment variable ..." step.
+	extraEnv []string
 }
 
 // env is the baseline environment for every mt run in the scenario:
 // fake $EDITOR plus an isolated config home, so the real user config
 // can never leak into a scenario.
 func (st *state) env() []string {
-	return []string{
+	env := []string{
 		st.editor.EditorVar(),
 		"XDG_CONFIG_HOME=" + filepath.Join(st.base, "config"),
 	}
+	return append(env, st.extraEnv...)
 }
 
 // expand substitutes the per-scenario placeholders in a step argument:
@@ -100,6 +104,7 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^the exit code is (\d+)$`, exitCodeIs)
 	sc.Step(`^stdout contains "([^"]*)"$`, stdoutContains)
 	sc.Step(`^stdout does not contain "([^"]*)"$`, stdoutDoesNotContain)
+	sc.Step(`^the environment variable "([^"]*)" is "([^"]*)"$`, envVarIs)
 	sc.Step(`^stdout matches "([^"]*)"$`, stdoutMatches)
 	sc.Step(`^stderr contains "([^"]*)"$`, stderrContains)
 	sc.Step(`^a temporary vault exists$`, temporaryVaultExists)
@@ -137,6 +142,16 @@ func iRunMt(ctx context.Context, args string) (context.Context, error) {
 	}
 	st.result = res
 	st.ran = true
+	return ctx, nil
+}
+
+// envVarIs sets an environment variable for the following mt runs.
+func envVarIs(ctx context.Context, name, value string) (context.Context, error) {
+	st, err := stateFrom(ctx)
+	if err != nil {
+		return ctx, err
+	}
+	st.extraEnv = append(st.extraEnv, name+"="+value)
 	return ctx, nil
 }
 
@@ -360,6 +375,7 @@ func stdoutDoesNotContain(ctx context.Context, want string) (context.Context, er
 	if err := st.requireResult(); err != nil {
 		return ctx, err
 	}
+	want = st.expand(want)
 	if strings.Contains(st.result.Stdout, want) {
 		return ctx, fmt.Errorf("stdout contains %q (want it absent):\n%s", want, st.result.Stdout)
 	}
@@ -374,6 +390,7 @@ func stdoutMatches(ctx context.Context, pattern string) (context.Context, error)
 	if err := st.requireResult(); err != nil {
 		return ctx, err
 	}
+	pattern = st.expand(pattern)
 	re, err := regexp.Compile(pattern)
 	if err != nil {
 		return ctx, fmt.Errorf("compiling regexp %q: %w", pattern, err)

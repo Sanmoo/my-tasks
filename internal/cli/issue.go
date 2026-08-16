@@ -13,9 +13,11 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/Sanmoo/my-tasks2/internal/exitcode"
 	"github.com/Sanmoo/my-tasks2/internal/issue"
+	"github.com/Sanmoo/my-tasks2/internal/show"
 	"github.com/Sanmoo/my-tasks2/internal/vault"
 )
 
@@ -106,12 +108,14 @@ func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool) er
 	return nil
 }
 
-// newShowCmd builds `mt show <id>`: prints the Issue file — frontmatter
-// and body — exactly as stored.
+// newShowCmd builds `mt show <id>`: renders the structured, colored
+// Issue view (header, metadata, Markdown body) in the style of nd show.
+// Colors follow the standard convention (NO_COLOR, CLICOLOR, TTY); a
+// piped stdout renders the same view without ANSI codes.
 func newShowCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "show <id>",
-		Short: "Show an Issue (frontmatter + body)",
+		Short: "Show an Issue (rendered view)",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
 				return exitcode.Usage(fmt.Errorf("show needs exactly one issue ID"))
@@ -133,7 +137,17 @@ func newShowCmd() *cobra.Command {
 				}
 				return fmt.Errorf("reading issue %s: %w", args[0], err)
 			}
-			_, err = cmd.OutOrStdout().Write(data)
+			i, err := issue.Parse(data)
+			if err != nil {
+				return fmt.Errorf("parsing issue %s: %w", args[0], err)
+			}
+			// TTY detection reads the real stdout, not the injected
+			// writer: the decision is about the terminal the process
+			// is attached to.
+			_, err = fmt.Fprint(cmd.OutOrStdout(), show.Render(i, args[0], show.Options{
+				Color: show.ShouldUseColor(term.IsTerminal(int(os.Stdout.Fd()))),
+				Width: termWidth(),
+			}))
 			return err
 		},
 	}
@@ -169,6 +183,15 @@ func newEditCmd() *cobra.Command {
 			return editFile(path)
 		},
 	}
+}
+
+// termWidth returns the terminal width in columns, 0 when unknown.
+func termWidth() int {
+	w, _, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		return 0
+	}
+	return w
 }
 
 // issuePath returns the Issue file path for an ID inside a vault.

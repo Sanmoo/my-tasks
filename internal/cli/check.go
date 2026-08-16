@@ -51,7 +51,7 @@ func runCheck(cmd *cobra.Command, fix bool) error {
 	if err != nil {
 		return err
 	}
-	if err := validateItems(vcfg, items); err != nil {
+	if err := validateVault(vcfg, items); err != nil {
 		return err
 	}
 	if fix {
@@ -66,7 +66,7 @@ func runCheck(cmd *cobra.Command, fix bool) error {
 		if err != nil {
 			return err
 		}
-		if err := validateItems(vcfg, items); err != nil {
+		if err := validateVault(vcfg, items); err != nil {
 			return err
 		}
 	}
@@ -129,14 +129,18 @@ func applyCheckRankChange(vaultDir string, change priority.Change) error {
 	return writeIssueFile(vaultDir, change.ID, i)
 }
 
-func validateItems(vcfg vault.Vault, items []check.Item) error {
+// validateVault runs the per-Issue schema checks (frontmatter values,
+// status, datetime layout) and the vault-wide blocked_by reference
+// checks (existence, self-block, cycles). It returns the first
+// violation found.
+func validateVault(vcfg vault.Vault, items []check.Item) error {
 	statuses := vcfg.StatusList()
 	for _, item := range items {
 		if err := check.ValidateItem(item, statuses); err != nil {
 			return err
 		}
 	}
-	return nil
+	return check.ValidateBlockedBy(items)
 }
 
 func formatRanks(ranks []int) string {

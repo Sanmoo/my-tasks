@@ -345,6 +345,86 @@ func TestPickNextTreatsDeferredUntilNowAsAvailable(t *testing.T) {
 	}
 }
 
+func TestStatusByID(t *testing.T) {
+	items := []list.Item{
+		item("a", "open", nil, "", ""),
+		item("b", "in_progress", nil, "", ""),
+		item("c", "done", nil, "", ""),
+	}
+	got := list.StatusByID(items)
+	if len(got) != 3 || got["a"] != "open" || got["b"] != "in_progress" || got["c"] != "done" {
+		t.Errorf("StatusByID = %v", got)
+	}
+}
+
+// blockedByItem builds an item that lists blockers in blocked_by.
+func blockedByItem(id, status string, blockedBy []string) list.Item {
+	it := item(id, status, nil, "", "")
+	it.Issue.Frontmatter.BlockedBy = blockedBy
+	return it
+}
+
+func TestBlocked(t *testing.T) {
+	byID := list.StatusByID([]list.Item{
+		item("done", "done", nil, "", ""),
+		item("open", "open", nil, "", ""),
+		item("progress", "in_progress", nil, "", ""),
+	})
+	tests := []struct {
+		name      string
+		blockedBy []string
+		want      bool
+	}{
+		{"no blockers", nil, false},
+		{"all blockers done", []string{"done"}, false},
+		{"open blocker", []string{"open"}, true},
+		{"in_progress blocker", []string{"progress"}, true},
+		{"any blocker not done", []string{"done", "open"}, true},
+		{"unknown blocker ID stays blocked", []string{"ghost"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := list.Blocked(tt.blockedBy, byID); got != tt.want {
+				t.Errorf("Blocked(%v) = %v, want %v", tt.blockedBy, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPickNextSkipsBlockedIssues(t *testing.T) {
+	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
+	items := []list.Item{
+		blockedByItem("blocked-rank-one", "open", []string{"open-blocker"}),
+		blockedByItem("open-blocker", "open", nil),
+		blockedByItem("blocked-by-done", "open", []string{"done-blocker"}),
+		blockedByItem("done-blocker", "done", nil),
+	}
+
+	got, err := list.PickNext(items, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// open-blocker has no rank and is available; blocked-by-done is
+	// unblocked and available — the oldest Backlog by created_at wins,
+	// and both blocked-by-open and blocked-by-done have equal created_at,
+	// so the tie-break is the ID.
+	if got.ID != "blocked-by-done" {
+		t.Errorf("PickNext() = %s, want blocked-by-done", got.ID)
+	}
+}
+
+func TestPickNextRejectsWhenEverythingIsBlocked(t *testing.T) {
+	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
+	items := []list.Item{
+		blockedByItem("a", "open", []string{"b"}),
+		blockedByItem("b", "in_progress", nil),
+	}
+
+	if _, err := list.PickNext(items, now); err == nil || !strings.Contains(err.Error(), "no available") {
+		t.Fatalf("PickNext() error = %v, want no-available error", err)
+	}
+}
+
 func TestPickNextDoesNotReorderInput(t *testing.T) {
 	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
 	items := []list.Item{

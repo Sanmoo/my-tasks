@@ -65,6 +65,7 @@ func runList(cmd *cobra.Command, all bool, statusFilter string, labelFilters []s
 	now := time.Now()
 	out := cmd.OutOrStdout()
 	opts := list.Options{All: all, Status: statusFilter, Labels: labelFilters}
+	statusByID := list.StatusByID(items)
 	for _, it := range items {
 		if !list.Visible(it, opts, now) {
 			continue
@@ -74,6 +75,9 @@ func runList(cmd *cobra.Command, all bool, statusFilter string, labelFilters []s
 			if suffix := list.DeferSuffix(it.Issue.Frontmatter.DeferredUntil, now); suffix != "" {
 				line += " " + suffix
 			}
+		}
+		if list.Blocked(it.Issue.Frontmatter.BlockedBy, statusByID) {
+			line += " [blocked]"
 		}
 		fmt.Fprintln(out, line)
 	}
@@ -132,7 +136,8 @@ const listLong = `list prints the vault's issues in priority order:
   without a rank) ordered by created_at; then ID as the final tiebreak.
 
 Each line is a status glyph (○ open, ◐ in_progress, ● done, ? for a
-custom status), the ID, and the title. done issues and issues deferred
+custom status), the ID, and the title. Issues blocked by another
+non-done Issue carry a [blocked] suffix. done issues and issues deferred
 to the future are hidden by default; --all shows them, marking
 future-deferred issues with a [defer MM-DD HH:MM] suffix. Use --status
 and --label to narrow the view.`

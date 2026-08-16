@@ -100,6 +100,8 @@ func TestValidateFrontmatter(t *testing.T) {
 		want string
 	}{
 		{"valid", validFile(), ""},
+		{"valid with blocked_by", []byte("---\ntitle: title\nstatus: open\nlabels: []\ncreated_at: 2026-01-01T10:00\nblocked_by: [pkm-001]\n---\nbody\n"), ""},
+		{"empty blocked_by scalar is an empty optional field", []byte("---\ntitle: title\nstatus: open\nlabels: []\ncreated_at: 2026-01-01T10:00\nblocked_by:\n---\nbody\n"), "empty optional field"},
 		{"missing opening delimiter", []byte("title: title\n---\n"), "start with"},
 		{"missing closing delimiter", []byte("---\ntitle: title\n"), "not closed"},
 		{"malformed YAML", []byte("---\nlabels: [unclosed\n---\n"), "malformed frontmatter"},
@@ -164,4 +166,137 @@ func TestValidateItem(t *testing.T) {
 	if err := check.ValidateItem(base, nil); err == nil || !strings.Contains(err.Error(), "valid:") {
 		t.Errorf("ValidateItem(empty statuses) = %v, want status-list error", err)
 	}
+}
+
+// blockedByItem builds an Item with a blocked_by list.
+func blockedByItem(id string, blockedBy []string) check.Item {
+	it := item(id, "open", nil, "2026-01-01T10:00")
+	it.Issue.Frontmatter.BlockedBy = blockedBy
+	return it
+}
+
+func TestValidateBlockedBy(t *testing.T) {
+	t.Run("valid vault", func(t *testing.T) {
+		items := []check.Item{
+			blockedByItem("pkm-001", nil),
+			blockedByItem("pkm-002", []string{"pkm-001"}),
+		}
+		if err := check.ValidateBlockedBy(items); err != nil {
+			t.Errorf("ValidateBlockedBy() = %v, want nil", err)
+		}
+	})
+
+	t.Run("reference to a done Issue is valid", func(t *testing.T) {
+		items := []check.Item{
+			blockedByItem("pkm-001", nil),
+			blockedByItem("pkm-002", []string{"pkm-001"}),
+		}
+		items[0].Issue.Frontmatter.Status = "done"
+		if err := check.ValidateBlockedBy(items); err != nil {
+			t.Errorf("ValidateBlockedBy() = %v, want nil", err)
+		}
+	})
+
+	t.Run("unknown reference", func(t *testing.T) {
+		items := []check.Item{
+			blockedByItem("pkm-001", nil),
+			blockedByItem("pkm-002", []string{"pkm-999"}),
+		}
+		err := check.ValidateBlockedBy(items)
+		if err == nil || !strings.Contains(err.Error(), "pkm-002") || !strings.Contains(err.Error(), "pkm-999") {
+			t.Errorf("ValidateBlockedBy() error = %v, want unknown-reference error naming both IDs", err)
+		}
+	})
+
+	t.Run("self-block", func(t *testing.T) {
+		items := []check.Item{
+			blockedByItem("pkm-001", []string{"pkm-001"}),
+		}
+		err := check.ValidateBlockedBy(items)
+		if err == nil || !strings.Contains(err.Error(), "pkm-001") || !strings.Contains(err.Error(), "itself") {
+			t.Errorf("ValidateBlockedBy() error = %v, want self-block error", err)
+		}
+	})
+
+	t.Run("two-cycle", func(t *testing.T) {
+		items := []check.Item{
+			blockedByItem("pkm-001", []string{"pkm-002"}),
+			blockedByItem("pkm-002", []string{"pkm-001"}),
+		}
+		err := check.ValidateBlockedBy(items)
+		if err == nil || !strings.Contains(err.Error(), "cycle") ||
+			!strings.Contains(err.Error(), "pkm-001 -> pkm-002 -> pkm-001") {
+			t.Errorf("ValidateBlockedBy() error = %v, want the two-cycle path", err)
+		}
+	})
+
+	t.Run("three-cycle", func(t *testing.T) {
+		items := []check.Item{
+			blockedByItem("pkm-001", []string{"pkm-002"}),
+			blockedByItem("pkm-002", []string{"pkm-003"}),
+			blockedByItem("pkm-003", []string{"pkm-001"}),
+		}
+		err := check.ValidateBlockedBy(items)
+		if err == nil || !strings.Contains(err.Error(), "cycle") ||
+			!strings.Contains(err.Error(), "pkm-001 -> pkm-002 -> pkm-003 -> pkm-001") {
+			t.Errorf("ValidateBlockedBy() error = %v, want the three-cycle path", err)
+		}
+	})
+
+	t.Run("cycle reachable only through a non-cycle start", func(t *testing.T) {
+		items := []check.Item{
+			blockedByItem("pkm-001", []string{"pkm-002"}),
+			blockedByItem("pkm-002", []string{"pkm-003"}),
+			blockedByItem("pkm-003", []string{"pkm-004"}),
+			blockedByItem("pkm-004", []string{"pkm-003"}),
+		}
+		err := check.ValidateBlockedBy(items)
+		if err == nil || !strings.Contains(err.Error(), "cycle") ||
+			!strings.Contains(err.Error(), "pkm-003 -> pkm-004 -> pkm-003") {
+			t.Errorf("ValidateBlockedBy() error = %v, want the inner cycle", err)
+		}
+	})
+
+	t.Run("cycle in a later Issue after an acyclic start", func(t *testing.T) {
+		// The first Item is acyclic, so a walk that stops at the first
+		// visited Item would miss the cycle between pkm-002 and pkm-003.
+		items := []check.Item{
+			blockedByItem("pkm-001", nil),
+			blockedByItem("pkm-002", []string{"pkm-003"}),
+			blockedByItem("pkm-003", []string{"pkm-002"}),
+		}
+		err := check.ValidateBlockedBy(items)
+		if err == nil || !strings.Contains(err.Error(), "cycle") ||
+			!strings.Contains(err.Error(), "pkm-002 -> pkm-003 -> pkm-002") {
+			t.Errorf("ValidateBlockedBy() error = %v, want the later cycle", err)
+		}
+	})
+
+	t.Run("acyclic chain plus a reference back stays valid", func(t *testing.T) {
+		// pkm-001 -> pkm-002 -> pkm-003 is a plain chain and pkm-004
+		// references pkm-001; nothing is cyclic. A walk that abandons
+		// the chain after its first acyclic subtree would report a
+		// false cycle through the abandoned path.
+		items := []check.Item{
+			blockedByItem("pkm-001", []string{"pkm-002"}),
+			blockedByItem("pkm-002", []string{"pkm-003"}),
+			blockedByItem("pkm-003", nil),
+			blockedByItem("pkm-004", []string{"pkm-001"}),
+		}
+		if err := check.ValidateBlockedBy(items); err != nil {
+			t.Errorf("ValidateBlockedBy() = %v, want nil", err)
+		}
+	})
+
+	t.Run("unknown reference is reported before a cycle", func(t *testing.T) {
+		items := []check.Item{
+			blockedByItem("pkm-001", []string{"pkm-002"}),
+			blockedByItem("pkm-002", []string{"pkm-001"}),
+			blockedByItem("pkm-003", []string{"pkm-999"}),
+		}
+		err := check.ValidateBlockedBy(items)
+		if err == nil || !strings.Contains(err.Error(), "unknown issue pkm-999") {
+			t.Errorf("ValidateBlockedBy() error = %v, want the unknown reference first", err)
+		}
+	})
 }

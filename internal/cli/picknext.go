@@ -62,7 +62,8 @@ const pickNextLong = `pick-next starts the next available open Issue:
 
   ranked Issues are chosen by the lowest Rank; when no ranked Issue is
   available, the oldest available Backlog Issue is chosen, with ID as the
-  final tie-break. Issues deferred into the future are skipped.
+  final tie-break. Issues deferred into the future and Issues blocked by
+  a non-done Issue are skipped.
 
 The chosen Issue becomes in_progress and receives a started_at timestamp.
 Duplicate ranks are rejected, and multiple Issues may be in_progress at once.`

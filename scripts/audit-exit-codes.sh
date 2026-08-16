@@ -80,6 +80,22 @@ run defer "$ID1" "26-08-20 08:00"
 run defer "$ID1" banana
 run defer "$ID1"
 
+label "dep"
+ID2=$("$MT" q "second issue" | tr -d '[:space:]')
+run dep
+run dep nope
+run dep add "$ID1" "$ID2"
+run dep add "$ID1" "$ID2"
+run dep add "$ID1" nope
+run dep add "$ID1" "$ID1"
+run dep add "$ID1"
+run dep add "$ID1" "$ID2" extra
+run dep rm "$ID1" "$ID2"
+run dep rm "$ID1" "$ID2"
+run dep rm "$ID1" nope
+run dep rm "$ID1"
+run dep rm "$ID1" "$ID2" extra
+
 label "prioritize / rank"
 run prioritize
 run top "$ID1"

@@ -22,19 +22,20 @@ const NaiveLayout = "2006-01-02T15:04"
 //
 // Always present: title, status, labels, created_at. Present only when
 // they have a value: rank, deferred_until, deadline, started_at,
-// completed_at. There is no id (the file name is the authority) and no
-// updated_at (Git and mtime track that).
+// completed_at, blocked_by. There is no id (the file name is the
+// authority) and no updated_at (Git and mtime track that).
 type Frontmatter struct {
 	Title     string   `yaml:"title"`
 	Status    string   `yaml:"status"`
 	Labels    []string `yaml:"labels,flow"`
 	CreatedAt string   `yaml:"created_at"`
 
-	Rank          *int   `yaml:"rank,omitempty"`
-	DeferredUntil string `yaml:"deferred_until,omitempty"`
-	Deadline      string `yaml:"deadline,omitempty"`
-	StartedAt     string `yaml:"started_at,omitempty"`
-	CompletedAt   string `yaml:"completed_at,omitempty"`
+	Rank          *int     `yaml:"rank,omitempty"`
+	DeferredUntil string   `yaml:"deferred_until,omitempty"`
+	Deadline      string   `yaml:"deadline,omitempty"`
+	StartedAt     string   `yaml:"started_at,omitempty"`
+	CompletedAt   string   `yaml:"completed_at,omitempty"`
+	BlockedBy     []string `yaml:"blocked_by,flow,omitempty"`
 }
 
 // Issue is one unit of work: the frontmatter plus the Markdown body

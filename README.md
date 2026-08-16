@@ -88,6 +88,7 @@ Resumo:
 | `mt reopen <id>` | reabre (limpa `completed_at` e `started_at`) |
 | `mt status <id> <status>` | transição livre de status |
 | `mt defer <id> <quando>` | adia a Issue até uma data/hora |
+| `mt dep add <id> <bloqueador>` / `mt dep rm <id> <bloqueador>` | registra/remove dependência (`blocked_by`) |
 | `mt comment <id> <texto>` | anexa um comentário com timestamp |
 | `mt list` | lista na ordem de prioridade |
 | `mt ready` | lista as Issues disponíveis agora |
@@ -176,6 +177,32 @@ mt defer pkm-055 +2d                  # relativo: +2d, +1w, +3h
 # → pkm-055 deferred until 2026-08-20T08:00
 ```
 
+### `mt dep add <id> <bloqueador>` | `mt dep rm <id> <bloqueador>`
+
+Registra dependências no campo `blocked_by` (mesmo vault, direção única: a
+Issue registra quem a bloqueia). Uma Issue está **blocked** enquanto alguma
+Issue listada não está `done` — estado computado, não status: não há
+transição nem operação de desbloqueio; fechar o bloqueador desbloqueia
+sozinho, e reabri-lo rebloqueia.
+
+```sh
+mt dep add pkm-002 pkm-001   # pkm-001 bloqueia pkm-002
+# → pkm-002 is now blocked by pkm-001
+
+mt dep rm pkm-002 pkm-001
+# → pkm-002 is no longer blocked by pkm-001
+```
+
+- `dep add` exige que o bloqueador exista no vault e que não seja a própria
+  Issue (erros de usuário, exit 1); argumentos malformados são erro de uso
+  (exit 2);
+- `dep rm` é idempotente — remove referências órfãs (ex.: para uma Issue
+  apagada) sem reclamar;
+- Issues bloqueadas aparecem com sufixo `[blocked]` no `list` e são puladas
+  por `ready` e `pick-next`;
+- `mt check` valida as referências: existência no vault, sem auto-bloqueio,
+  sem ciclos.
+
 ### `mt comment <id> <texto>`
 
 Anexa um comentário à seção `## Comments` da Issue: heading com timestamp,
@@ -205,7 +232,10 @@ linha é um glyph de status, o ID e o título:
 ○ pkm-003  ideia do backlog
 ```
 
-Issues `done` e adiadas para o futuro ficam ocultas por padrão. Flags:
+Issues `done` e adiadas para o futuro ficam ocultas por padrão. Issues
+bloqueadas (algum ID de `blocked_by` não está `done`) ficam visíveis com
+sufixo `[blocked]` — com `--all`, o sufixo de adiamento e o `[blocked]`
+aparecem juntos. Flags:
 
 - `--all` — mostra `done` e adiadas; adiadas ganham sufixo `[defer MM-DD HH:MM]`;
 - `--status <s>` — filtra por status;
@@ -217,8 +247,8 @@ e `?` para status customizados.
 
 ### `mt ready` e `mt overdue`
 
-- `ready` — as Issues `open` e disponíveis agora (`now >= deferred_until`),
-  na ordem de prioridade de `list`;
+- `ready` — as Issues `open` e disponíveis agora (`now >= deferred_until` e
+  nenhum bloqueador não-`done`), na ordem de prioridade de `list`;
 - `overdue` — as Issues não-`done` com `deadline` no passado. O Deadline é
   informativo: não bloqueia nada, só aparece aqui.
 
@@ -229,8 +259,9 @@ Ambas respeitam o formato de linha de `list`; sem correspondências, a saída
 
 Inicia a próxima Issue disponível: a `open` de menor Rank; sem Issues
 rankeadas, a mais antiga do Backlog (desempate por ID). Adiadas para o
-futuro são puladas. A Issue escolhida vira `in_progress` e recebe
-`started_at`. Várias Issues `in_progress` simultâneas são permitidas.
+futuro e bloqueadas (algum bloqueador não-`done`) são puladas. A Issue
+escolhida vira `in_progress` e recebe `started_at`. Várias Issues
+`in_progress` simultâneas são permitidas.
 
 ```sh
 mt pick-next
@@ -284,7 +315,9 @@ Audita a integridade do vault:
   a fila continua não-ambígua;
 - YAML/frontmatter malformado — erro, nomeando a Issue;
 - Status fora da lista configurada do vault — erro;
-- Datetime em formato inválido — erro.
+- Datetime em formato inválido — erro;
+- `blocked_by` — referência a Issue inexistente, auto-bloqueio ou ciclo —
+  erro, nomeando os IDs envolvidos.
 
 `--fix` renormaliza os Ranks para 1..N (escrevendo só os arquivos alterados)
 e revalida. Vault íntegro: `OK` no stdout, exit 0.
@@ -369,6 +402,7 @@ created_at: 2026-08-15T09:30
 rank: 2
 deferred_until: 2026-08-20T08:00
 deadline: 2026-08-22T18:00
+blocked_by: [pkm-042]
 ---
 
 ## Description
@@ -383,7 +417,7 @@ Regras de campo:
 
 - Sempre presentes: `title`, `status`, `labels`, `created_at`;
 - Só quando têm valor: `rank`, `deferred_until`, `deadline`, `started_at`,
-  `completed_at`;
+  `completed_at`, `blocked_by`;
 - Sem `id` (o nome do arquivo é a autoridade) e sem `updated_at` (o Git é o
   histórico);
 - Datas são `YYYY-MM-DDTHH:MM` naive (sem timezone, sem segundos) — diffs

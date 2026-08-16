@@ -1,11 +1,12 @@
 // Package list holds the pure logic of `mt list` and `mt pick-next`: the
 // Rank ordering of issues (Rank → Backlog by created_at → ID), the
 // per-status glyphs, the visibility rules (done/future-deferred hiding,
-// status/label filters), the deferred-until availability/suffix rules, and
-// duplicate-rank detection. It is decision-dense, so it lives at Seam 2:
-// black-box unit tested, with the coverage and mutation gates. Reading
-// the issue files themselves is a process concern and stays in
-// internal/cli.
+// status/label filters), the deferred-until availability/suffix rules,
+// the computed blocked state (an Issue is blocked while any ID in its
+// blocked_by is not done), and duplicate-rank detection. It is
+// decision-dense, so it lives at Seam 2: black-box unit tested, with the
+// coverage and mutation gates. Reading the issue files themselves is a
+// process concern and stays in internal/cli.
 package list
 
 import (
@@ -108,8 +109,11 @@ func IsFutureDeferred(deferredUntil string, now time.Time) bool {
 	return ok && t.After(now)
 }
 
-// Ready reports whether item is an open Issue available at now. An empty or
-// malformed deferred_until does not prevent availability; mt check owns
+// Ready reports whether item is an open Issue that is temporally
+// available at now: its deferral, if any, has passed. Blocked state is
+// computed separately against the whole Vault (see Blocked); callers
+// that mean "available" combine both. An empty or malformed
+// deferred_until does not prevent availability; mt check owns
 // validation of persisted datetime fields.
 func Ready(item Item, now time.Time) bool {
 	return item.Issue.Frontmatter.Status == "open" && !IsFutureDeferred(item.Issue.Frontmatter.DeferredUntil, now)
@@ -132,6 +136,31 @@ func DeferSuffix(deferredUntil string, now time.Time) string {
 		return ""
 	}
 	return "[defer " + t.Format("01-02 15:04") + "]"
+}
+
+// StatusByID indexes items by their ID for the blocked lookup: the map
+// holds each item's status, and an ID with no issue is absent. The
+// caller builds it once per vault view and passes it to Blocked.
+func StatusByID(items []Item) map[string]string {
+	byID := make(map[string]string, len(items))
+	for _, item := range items {
+		byID[item.ID] = item.Issue.Frontmatter.Status
+	}
+	return byID
+}
+
+// Blocked reports whether an Issue with the given blocked_by list is
+// blocked: at least one referenced ID is not done. An ID absent from
+// statusByID counts as not done — a dangling reference can never be
+// done, so the Issue stays blocked; mt check owns flagging the missing
+// reference. An empty list is never blocked.
+func Blocked(blockedBy []string, statusByID map[string]string) bool {
+	for _, id := range blockedBy {
+		if statusByID[id] != "done" {
+			return true
+		}
+	}
+	return false
 }
 
 // Options selects the issues a list view shows.
@@ -173,20 +202,24 @@ func Visible(item Item, opts Options, now time.Time) bool {
 // PickNext returns the first available open Issue under the Rank order:
 // the lowest rank wins; when no ranked candidate is
 // available, the oldest Backlog Issue wins, with ID as the final tie-break.
-// Future-deferred Issues are unavailable, while a deferred_until exactly at
-// now is available. Duplicate ranks anywhere in the vault are rejected
+// Future-deferred and blocked Issues are unavailable, while a deferred_until
+// exactly at now is available. Duplicate ranks anywhere in the vault are rejected
 // before candidate selection, including ranks on non-open Issues.
 func PickNext(items []Item, now time.Time) (Item, error) {
 	if dups := DuplicateRanks(items); len(dups) > 0 {
 		return Item{}, fmt.Errorf("duplicate rank: %d", dups[0])
 	}
 
+	statusByID := StatusByID(items)
 	candidates := make([]Item, 0, len(items))
 	for _, item := range items {
 		if item.Issue.Frontmatter.Status != "open" {
 			continue
 		}
 		if IsFutureDeferred(item.Issue.Frontmatter.DeferredUntil, now) {
+			continue
+		}
+		if Blocked(item.Issue.Frontmatter.BlockedBy, statusByID) {
 			continue
 		}
 		candidates = append(candidates, item)

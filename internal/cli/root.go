@@ -107,6 +107,7 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(newReopenCmd())
 	cmd.AddCommand(newStatusCmd())
 	cmd.AddCommand(newDeferCmd())
+	cmd.AddCommand(newDepCmd())
 	cmd.AddCommand(newPickNextCmd())
 	cmd.AddCommand(newPrioritizeCmd())
 	cmd.AddCommand(newTopCmd())

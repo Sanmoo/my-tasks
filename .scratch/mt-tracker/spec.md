@@ -151,7 +151,7 @@ Inclui issues `open` e `in_progress`. Reordenar `[P]` muda a ordem; trocar `[ ]`
 
 ## Out of Scope
 
-Dependências/blockers, epics, full-text search, TUI de ordenação, migração do vault nd (`import-nd` — one-off pós-validação do formato), multi-usuário/assignee, sync multi-branch, armazenar `updated_at`, `content_hash`, export/import JSON, plugins.
+Dependências computadas (ADR-0004): `blocked_by` é campo e o estado blocked é derivado. Fora do escopo: epics, full-text search, TUI de ordenação, migração do vault nd (`import-nd` — one-off pós-validação do formato), multi-usuário/assignee, sync multi-branch, armazenar `updated_at`, `content_hash`, export/import JSON, plugins.
 
 ## Further Notes
 

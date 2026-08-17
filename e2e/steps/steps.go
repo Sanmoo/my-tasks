@@ -103,6 +103,7 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^the working directory is "([^"]*)"$`, workingDirectoryIs)
 	sc.Step(`^the exit code is (\d+)$`, exitCodeIs)
 	sc.Step(`^stdout contains "([^"]*)"$`, stdoutContains)
+	sc.Step(`^stdout is empty$`, stdoutIsEmpty)
 	sc.Step(`^stdout does not contain "([^"]*)"$`, stdoutDoesNotContain)
 	sc.Step(`^the environment variable "([^"]*)" is "([^"]*)"$`, envVarIs)
 	sc.Step(`^stdout matches "([^"]*)"$`, stdoutMatches)
@@ -215,6 +216,21 @@ func streamContains(ctx context.Context, stream, want string) (context.Context, 
 	}
 	if !strings.Contains(got, want) {
 		return ctx, fmt.Errorf("%s does not contain %q\n%s:\n%s", stream, want, stream, got)
+	}
+	return ctx, nil
+}
+
+// stdoutIsEmpty asserts that the last run wrote nothing to stdout.
+func stdoutIsEmpty(ctx context.Context) (context.Context, error) {
+	st, err := stateFrom(ctx)
+	if err != nil {
+		return ctx, err
+	}
+	if err := st.requireResult(); err != nil {
+		return ctx, err
+	}
+	if st.result.Stdout != "" {
+		return ctx, fmt.Errorf("stdout is not empty:\n%s", st.result.Stdout)
 	}
 	return ctx, nil
 }
@@ -512,7 +528,8 @@ func fileWrittenWith(ctx context.Context, path string, doc *godog.DocString) (co
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return ctx, fmt.Errorf("creating parent of %q: %w", path, err)
 	}
-	if err := os.WriteFile(path, []byte(doc.Content), 0o644); err != nil {
+	content := st.expand(doc.Content)
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		return ctx, fmt.Errorf("writing %q: %w", path, err)
 	}
 	return ctx, nil

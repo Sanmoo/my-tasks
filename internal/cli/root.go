@@ -38,6 +38,13 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return report(stderr, exitcode.Usage(err))
 	}
+	// A command line that is entirely a @bookmark (e.g. bare `mt @bjd`)
+	// leaves args as a nil slice; cobra's SetArgs treats nil as "unspecified"
+	// and falls back to os.Args[1:], re-introducing the @bookmark. Normalize
+	// so cobra always runs exactly the stripped args.
+	if args == nil {
+		args = []string{}
+	}
 
 	cmd := NewRootCmd()
 	cmd.SetOut(stdout)
@@ -84,8 +91,17 @@ func NewRootCmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Bare `mt` shows help, like `mt --help`.
-			return cmd.Help()
+			// Bare `mt` (no command after extracting @bookmark) lists the
+			// resolved vault's in_progress Issues — strictly the output of
+			// `mt list --status in_progress`: same lines (glyph, ID,
+			// title), same [blocked]/[defer ...] suffixes, same duplicate
+			// rank warning on stderr, empty stdout and exit 0 with no
+			// in_progress Issues. With no resolvable vault it fails with
+			// the resolution instructions (exit 1); the list flags do not
+			// bubble up to the root, so `mt --status ...` stays a usage
+			// error. `mt help` and `mt --help` remain the way to the root
+			// help.
+			return runList(cmd, false, "in_progress", nil)
 		},
 		SilenceErrors: true,
 		SilenceUsage:  true,
@@ -186,6 +202,10 @@ one Vault per domain, everything versioned in Git.
 Vaults are addressed by @bookmark, --vault <path>, or the default
 bookmark in the global config. With none of them, vault-requiring
 commands fail with instructions.
+
+Bare mt (no command) shows the resolved vault's in_progress Issues,
+like 'mt list --status in_progress'. 'mt help' and 'mt --help' show
+this help.
 
 Exit codes:
   0  success

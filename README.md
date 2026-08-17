@@ -254,6 +254,16 @@ linha é um glyph de status, o ID e o título:
 ○ pkm-003  ideia do backlog
 ```
 
+`mt` sem comando (após extrair `@bookmark`) é um atalho para
+`mt list --status in_progress` contra o vault resolvido — "o que estou
+fazendo agora". A saída é estritamente a mesma: mesmas linhas, mesmos
+sufixos `[blocked]`/`[defer ...]` e mesmo warning de Rank duplicado no
+stderr. Sem Issues `in_progress`, a saída é vazia com exit 0; sem vault
+resolvível (`@`, `--vault` ou favorito principal), falha com as instruções
+exit 1. Status personalizados nunca aparecem no `mt` bare — a equivalência
+é com o status literal `in_progress`. As flags do `list` não sobem pro bare:
+`mt --status ...` é erro de uso (exit 2).
+
 Apenas Issues `done` ficam ocultas por padrão; adiadas para o futuro ficam
 visíveis, com sufixo `[defer MM-DD HH:MM]`. Issues bloqueadas (algum ID de
 `blocked_by` não está `done`) ficam visíveis com sufixo `[blocked]` — os dois
@@ -382,10 +392,11 @@ O bookmark padrão é definido pela chave `default:` da config global.
 
 ### `mt help [comando]`
 
-`mt help` (ou `--help`, ou `mt` sem argumentos) mostra a ajuda raiz;
-`mt help <comando>` mostra a ajuda do comando. Tópico desconhecido é erro de
-uso (exit 2). O comando auxiliar `mt completion <shell>` (adicionado pelo
-Cobra) gera scripts de completação para o shell.
+`mt help` (ou `--help`) mostra a ajuda raiz; `mt help <comando>` mostra a
+ajuda do comando. Tópico desconhecido é erro de uso (exit 2). O comando
+auxiliar `mt completion <shell>` (adicionado pelo Cobra) gera scripts de
+completação para o shell. `mt` sem comando não mostra mais a ajuda: lista as
+Issues `in_progress` do vault resolvido (ver [`mt list`](#mt-list)).
 
 ## Configuração global
 

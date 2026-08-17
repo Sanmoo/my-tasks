@@ -1,6 +1,7 @@
 package priority_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -597,4 +598,91 @@ func rankEqual(a, b *int) bool {
 		return a == nil && b == nil
 	}
 	return *a == *b
+}
+
+func TestPlanQueueFirstThenNonPrioritizableRanks(t *testing.T) {
+	// A done or custom-status Issue holding a rank inside the queue range
+	// must not collide with the queue renormalization: the queue keeps
+	// 1..N and the non-prioritizable ranked Issues follow at N+1..M in
+	// their existing rank order.
+	issues := []priority.Issue{
+		{ID: "d", Status: "done", Rank: ptr(1), CreatedAt: "2026-08-14T10:00"},
+		{ID: "x", Status: "blocked", Rank: ptr(2), CreatedAt: "2026-08-13T10:00"},
+		{ID: "a", Status: "open", Rank: ptr(3), CreatedAt: "2026-08-15T10:00"},
+		{ID: "b", Status: "open", Rank: ptr(4), CreatedAt: "2026-08-16T10:00"},
+	}
+	entries := []priority.Entry{
+		{Prioritized: true, ID: "a"},
+		{Prioritized: true, ID: "b"},
+	}
+	changes, err := priority.Plan(entries, issues)
+	if err != nil {
+		t.Fatalf("Plan() error: %v", err)
+	}
+	want := []priority.Change{
+		{ID: "a", Rank: ptr(1)},
+		{ID: "b", Rank: ptr(2)},
+		{ID: "d", Rank: ptr(3)},
+		{ID: "x", Rank: ptr(4)},
+	}
+	if len(changes) != len(want) {
+		t.Fatalf("Plan() = %d changes, want %d: %+v", len(changes), len(want), changes)
+	}
+	for i := range want {
+		if changes[i].ID != want[i].ID || !rankEqual(changes[i].Rank, want[i].Rank) {
+			t.Errorf("changes[%d] = %+v, want %+v", i, changes[i], want[i])
+		}
+	}
+	// Applying the changes must leave every rank unique across the vault.
+	if dups := duplicateRanksAfter(issues, changes); len(dups) > 0 {
+		t.Errorf("Plan() changes produce duplicate ranks %v: %+v", dups, changes)
+	}
+}
+
+func TestPlanZeroChurnWithNonPrioritizableRankAfterQueue(t *testing.T) {
+	// done holding rank 3 already sits after the 2-issue queue: nothing
+	// may be rewritten, the done file stays untouched.
+	issues := []priority.Issue{
+		{ID: "a", Status: "open", Rank: ptr(1), CreatedAt: "2026-08-15T10:00"},
+		{ID: "b", Status: "in_progress", Rank: ptr(2), CreatedAt: "2026-08-16T10:00"},
+		{ID: "d", Status: "done", Rank: ptr(3), CreatedAt: "2026-08-14T10:00"},
+	}
+	entries := []priority.Entry{
+		{Prioritized: true, ID: "a"},
+		{Prioritized: true, ID: "b"},
+	}
+	changes, err := priority.Plan(entries, issues)
+	if err != nil {
+		t.Fatalf("Plan() error: %v", err)
+	}
+	if len(changes) != 0 {
+		t.Errorf("Plan() = %+v, want no changes (zero churn)", changes)
+	}
+}
+
+// duplicateRanksAfter applies the changes to a copy of issues and returns
+// the rank values held by more than one Issue — the vault-wide uniqueness
+// check mirroring internal/list.DuplicateRanks.
+func duplicateRanksAfter(issues []priority.Issue, changes []priority.Change) []int {
+	final := make(map[string]*int, len(issues))
+	for _, is := range issues {
+		final[is.ID] = is.Rank
+	}
+	for _, ch := range changes {
+		final[ch.ID] = ch.Rank
+	}
+	counts := make(map[int]int)
+	for _, r := range final {
+		if r != nil {
+			counts[*r]++
+		}
+	}
+	dups := make([]int, 0)
+	for r, n := range counts {
+		if n > 1 {
+			dups = append(dups, r)
+		}
+	}
+	slices.Sort(dups)
+	return dups
 }

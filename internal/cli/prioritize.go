@@ -177,6 +177,8 @@ issues, one line each:
 Reorder the [P] lines to change their order; toggle [ ]↔[P] to move an
 issue between the queue and the Backlog. Save and close to apply: ranks
 are renormalized 1..N and only the files whose rank changed are rewritten.
+Ranked done/custom-status issues are not in the buffer and keep their ranks
+right after the queue (N+1..M), so the vault never holds a duplicate rank.
 
 An invalid buffer (unknown or duplicated issue ID) is rejected and
 nothing is applied.`

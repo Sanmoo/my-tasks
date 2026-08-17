@@ -127,6 +127,60 @@ Feature: Prioritize via $EDITOR
     And the file "<vault>/issues/pkm-001.md" contains "rank: 2"
     And the file "<vault>/issues/pkm-002.md" does not contain "rank:"
 
+  Scenario: a done issue holding a queue rank is renumbered past the queue
+    Given the file "<vault>/issues/pkm-001.md" is written with:
+      """
+      ---
+      title: closed top
+      status: done
+      labels: []
+      created_at: 2026-01-01T10:00
+      rank: 1
+      ---
+
+      ## Description
+      ## Notes
+      ## Comments
+      """
+    And the file "<vault>/issues/pkm-002.md" is written with:
+      """
+      ---
+      title: second
+      status: open
+      labels: []
+      created_at: 2026-01-02T10:00
+      rank: 2
+      ---
+
+      ## Description
+      ## Notes
+      ## Comments
+      """
+    And the file "<vault>/issues/pkm-003.md" is written with:
+      """
+      ---
+      title: third
+      status: open
+      labels: []
+      created_at: 2026-01-03T10:00
+      rank: 3
+      ---
+
+      ## Description
+      ## Notes
+      ## Comments
+      """
+    Given the fake editor writes
+      """
+      [P] pkm-002  second
+      [P] pkm-003  third
+      """
+    When I run `mt prioritize --vault <vault>`
+    Then the exit code is 0
+    And the file "<vault>/issues/pkm-002.md" contains "rank: 1"
+    And the file "<vault>/issues/pkm-003.md" contains "rank: 2"
+    And the file "<vault>/issues/pkm-001.md" contains "rank: 3"
+
   Scenario: open and in_progress are included, done is left untouched
     Given the file "<vault>/issues/pkm-001.md" is written with:
       """

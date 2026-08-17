@@ -181,9 +181,13 @@ type Change struct {
 
 // Plan validates entries against the vault's issues and computes the rank
 // changes to apply. [P] entries get ranks 1..N in buffer order; [ ]
-// entries go to the Backlog. It returns a Change only for issues whose
-// rank actually differs from their current rank — unchanged issues yield
-// no change, so the caller rewrites only what moved (zero churn).
+// entries go to the Backlog. Ranked issues that are not prioritizable
+// (done or a custom status) are not in the buffer, but Rank is a
+// vault-wide invariant, so they keep their ranks renumbered after the
+// queue (N+1..M) in their existing rank order. It returns a Change only
+// for issues whose rank actually differs from their current rank —
+// unchanged issues yield no change, so the caller rewrites only what
+// moved (zero churn).
 //
 // Plan fails — returning no plan — when any entry names an unknown ID,
 // a non-prioritizable issue (done or a custom status), a duplicate ID, or
@@ -224,6 +228,24 @@ func Plan(entries []Entry, issues []Issue) ([]Change, error) {
 		}
 		if !rankEqual(byID[e.ID].Rank, target) {
 			changes = append(changes, Change{ID: e.ID, Rank: target})
+		}
+	}
+	// Ranked issues outside the buffer (done, custom statuses) follow the
+	// queue at N+1..M in their existing rank order, so the vault keeps
+	// unique contiguous ranks — a duplicate would make mt check fail and
+	// mt pick-next refuse to select.
+	rest := make([]Issue, 0)
+	for _, is := range issues {
+		if is.Rank != nil && !Prioritizable(is.Status) {
+			rest = append(rest, is)
+		}
+	}
+	slices.SortFunc(rest, Compare)
+	for _, is := range rest {
+		rank++
+		r := rank
+		if !rankEqual(is.Rank, &r) {
+			changes = append(changes, Change{ID: is.ID, Rank: &r})
 		}
 	}
 	return changes, nil

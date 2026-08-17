@@ -319,6 +319,9 @@ Abre o `$EDITOR` com um buffer das Issues `open` e `in_progress`:
 - `[ ]` ↔ `[P]` move a Issue entre o Backlog e a fila;
 - Ao salvar, os ranks são renormalizados 1..N e só os arquivos cujo rank
   mudou são reescritos (apply in-process, sem subprocesso por item);
+  Issues ranqueadas fora da fila (`done`/status customizado) seguem depois,
+  em N+1..M na ordem de rank existente — o vault nunca fica com rank
+  duplicado;
 - Buffer inválido (ID desconhecido/duplicado, linha malformada, Issue não
   priorizável — `done`/status customizado — no buffer) → erro, nada é
   aplicado (exit 1).

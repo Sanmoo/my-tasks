@@ -92,16 +92,9 @@ func NewRootCmd() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Bare `mt` (no command after extracting @bookmark) lists the
-			// resolved vault's in_progress Issues — strictly the output of
-			// `mt list --status in_progress`: same lines (glyph, ID,
-			// title), same [blocked]/[defer ...] suffixes, same duplicate
-			// rank warning on stderr, empty stdout and exit 0 with no
-			// in_progress Issues. With no resolvable vault it fails with
-			// the resolution instructions (exit 1); the list flags do not
-			// bubble up to the root, so `mt --status ...` stays a usage
-			// error. `mt help` and `mt --help` remain the way to the root
-			// help.
-			return runList(cmd, false, "in_progress", nil)
+			// resolved vault's in_progress Issues — strictly `mt list
+			// --status in_progress` (see rootLong for the full behavior).
+			return runList(cmd, false, statusInProgress, nil)
 		},
 		SilenceErrors: true,
 		SilenceUsage:  true,

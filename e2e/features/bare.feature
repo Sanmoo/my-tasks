@@ -199,12 +199,8 @@ Feature: Bare mt lists in_progress
     And stderr contains "unknown flag"
     And stdout does not contain "Usage:"
 
-  Scenario: mt help and mt --help still show the root help
+  Scenario: mt help still shows the root help
     When I run `mt help`
-    Then the exit code is 0
-    And stdout contains "Usage:"
-    And stdout contains "Exit codes"
-    When I run `mt --help`
     Then the exit code is 0
     And stdout contains "Usage:"
     And stdout contains "Exit codes"

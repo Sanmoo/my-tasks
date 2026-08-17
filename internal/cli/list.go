@@ -16,6 +16,11 @@ import (
 	"github.com/Sanmoo/my-tasks2/internal/list"
 )
 
+// statusInProgress is the literal status bare `mt` lists. The bare view
+// is strictly `mt list --status in_progress` (spec): custom statuses never
+// appear in it, even ones a vault defines as semantically similar.
+const statusInProgress = "in_progress"
+
 // newListCmd builds `mt list`: issues in priority order (rank → backlog
 // by created_at → id), one glyph per status, done hidden by default
 // (--all reveals them), future-deferred always shown and marked with a

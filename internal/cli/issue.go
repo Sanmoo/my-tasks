@@ -54,8 +54,7 @@ its rank.`,
 		},
 	}
 	cmd.Flags().StringArrayVar(&labels, "label", nil, "label; repeatable (free-form)")
-	cmd.Flags().BoolVarP(&top, "top", "t", false, "create the Issue at the top of the queue (rank 1)")
-	cmd.Flags().BoolVarP(&bottom, "bottom", "b", false, "create the Issue at the end of the queue")
+	addPlacementFlags(cmd, &top, &bottom)
 	return cmd
 }
 
@@ -81,9 +80,16 @@ func newQCmd() *cobra.Command {
 			return runCreate(cmd, strings.Join(args, " "), nil, true, placementAction(top, bottom))
 		},
 	}
-	cmd.Flags().BoolVarP(&top, "top", "t", false, "create the Issue at the top of the queue (rank 1)")
-	cmd.Flags().BoolVarP(&bottom, "bottom", "b", false, "create the Issue at the end of the queue")
+	addPlacementFlags(cmd, &top, &bottom)
 	return cmd
+}
+
+// addPlacementFlags registers the queue-placement flags shared by create
+// and q: -t/--top puts the new Issue at position 1, -b/--bottom at the
+// end. The pair is mutually exclusive (checkPlacementFlags).
+func addPlacementFlags(cmd *cobra.Command, top, bottom *bool) {
+	cmd.Flags().BoolVarP(top, "top", "t", false, "create the Issue at the top of the queue (rank 1)")
+	cmd.Flags().BoolVarP(bottom, "bottom", "b", false, "create the Issue at the end of the queue")
 }
 
 // checkPlacementFlags rejects --top and --bottom together: the two
@@ -142,7 +148,6 @@ func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, pl
 		},
 		Body: issue.DefaultBody,
 	}
-	var placedRank *int
 	if placement != nil {
 		rank, others, err := planCreatePlacement(vaultDir, priorityIssueFrom(id, i), *placement)
 		if err != nil {
@@ -155,7 +160,6 @@ func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, pl
 			return err
 		}
 		i.Frontmatter.Rank = &rank
-		placedRank = &rank
 	}
 	data, err := issue.Render(i)
 	if err != nil {
@@ -168,7 +172,7 @@ func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, pl
 	case quiet:
 		fmt.Fprintln(cmd.OutOrStdout(), id)
 	case placement != nil:
-		fmt.Fprintf(cmd.OutOrStdout(), "Created %s (rank %d)\n", id, *placedRank)
+		fmt.Fprintf(cmd.OutOrStdout(), "Created %s (rank %d)\n", id, *i.Frontmatter.Rank)
 	default:
 		fmt.Fprintf(cmd.OutOrStdout(), "Created %s\n", id)
 	}

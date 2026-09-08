@@ -196,9 +196,10 @@ func TestCreatePlacementOnEmptyQueue(t *testing.T) {
 	} {
 		t.Run(tc.flag, func(t *testing.T) {
 			vaultDir := newVault(t)
-			code, stdout, stderr := runMT(t, "create", "--vault", vaultDir, "--"+tc.flag, "novo")
+			// The shorthand form (-t/-b) doubles as shorthand coverage.
+			code, stdout, stderr := runMT(t, "create", "--vault", vaultDir, "-"+tc.flag[:1], "novo")
 			if code != 0 {
-				t.Fatalf("create --%s: exit %d, stderr: %s", tc.flag, code, stderr)
+				t.Fatalf("create -%s: exit %d, stderr: %s", tc.flag[:1], code, stderr)
 			}
 			id := createdID(t, stdout)
 			if want := "Created " + id + " (rank 1)\n"; stdout != want {
@@ -213,7 +214,7 @@ func TestCreateRejectsTopAndBottomTogether(t *testing.T) {
 	for _, cmd := range []string{"create", "q"} {
 		t.Run(cmd, func(t *testing.T) {
 			vaultDir := newVault(t)
-			code, stdout, stderr := runMT(t, cmd, "--vault", vaultDir, "--top", "--bottom", "x")
+			code, stdout, stderr := runMT(t, cmd, "--vault", vaultDir, "-t", "-b", "x")
 			if code != 2 {
 				t.Fatalf("%s --top --bottom: exit %d, want 2 (stderr: %s)", cmd, code, stderr)
 			}

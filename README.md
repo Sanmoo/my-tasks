@@ -80,8 +80,8 @@ Resumo:
 | Comando | O que faz |
 | --- | --- |
 | `mt init [dir]` | cria um Vault (`issues/` + `mt.yaml`) |
-| `mt create <título>` | cria uma Issue |
-| `mt q <título>` | cria uma Issue e imprime só o ID |
+| `mt create <título>` | cria uma Issue (`-t`/`-b` entram direto na fila) |
+| `mt q <título>` | cria uma Issue e imprime só o ID (mesmas flags do create) |
 | `mt show <id>` | mostra a Issue renderizada (header, metadados, corpo) |
 | `mt edit <id>` | abre a Issue no `$EDITOR` |
 | `mt done <id>` (alias `close`) | fecha a Issue (carimba `completed_at`) |
@@ -140,6 +140,20 @@ mt q "anotar rápido"
 ```
 
 - `--label <l>` — label livre, repetível (create).
+- `-t`/`--top` — cria a Issue já na posição 1 da fila, deslocando as demais
+  (mesma semântica do `mt top`); imprime `Created <id> (rank <n>)`.
+- `-b`/`--bottom` — cria a Issue já no fim da fila (mesma semântica do
+  `mt bottom`); imprime `Created <id> (rank <n>)`.
+- `-t` e `-b` juntas → erro de uso (exit 2). Sem flag, a Issue vai ao
+  Backlog e a saída é inalterada; `q` imprime só o ID em todos os casos.
+
+```sh
+mt create "urgente" --top
+# → Created pkm-0b4c (rank 1)
+
+mt q "ideia" --bottom
+# → pkm-1x9d        (entra no fim da fila, saída continua só o ID)
+```
 
 ### `mt show <id>` e `mt edit <id>`
 
@@ -344,6 +358,9 @@ mt bottom pkm-055       # última posição da fila
 mt rank pkm-055 3       # insere na posição 3 (1-based)
 mt unrank pkm-055       # de volta ao Backlog
 ```
+
+`create`/`q` aceitam `--top`/`--bottom` para criar a Issue já na fila com a
+mesma semântica destes comandos (sem precisar rodá-los em seguida).
 
 Como no `prioritize`, a fila é renormalizada e só os arquivos alterados são
 reescritos. Posição fora da fila atual → erro (exit 1); posição que não é

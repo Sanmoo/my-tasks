@@ -53,6 +53,155 @@ Feature: Issue create, show and edit
     And stdout does not contain "<id>"
     And the directory "<vault>/issues" contains 2 files
 
+  Scenario: create --bottom puts the new Issue at the end of the queue
+    Given the file "<vault>/issues/pkm-001.md" is written with:
+      """
+      ---
+      title: first
+      status: open
+      labels: []
+      created_at: 2026-01-01T10:00
+      rank: 1
+      ---
+
+      ## Description
+      ## Notes
+      ## Comments
+      """
+    And the file "<vault>/issues/pkm-002.md" is written with:
+      """
+      ---
+      title: second
+      status: open
+      labels: []
+      created_at: 2026-01-02T10:00
+      rank: 2
+      ---
+
+      ## Description
+      ## Notes
+      ## Comments
+      """
+    When I run `mt create --vault <vault> --bottom "comprar material"`
+    Then the exit code is 0
+    And stdout matches "^Created pkm-[0-9a-z]{4} \(rank 3\)\n$"
+    And the file "<vault>/issues/pkm-001.md" contains "rank: 1"
+    And the file "<vault>/issues/pkm-002.md" contains "rank: 2"
+    When I run `mt list --vault <vault>`
+    Then stdout matches "^○ pkm-001  first\n○ pkm-002  second\n○ pkm-[0-9a-z]{4}  comprar material\n$"
+
+  Scenario: create --top puts the new Issue first and shifts the queue
+    Given the file "<vault>/issues/pkm-001.md" is written with:
+      """
+      ---
+      title: first
+      status: open
+      labels: []
+      created_at: 2026-01-01T10:00
+      rank: 1
+      ---
+
+      ## Description
+      ## Notes
+      ## Comments
+      """
+    And the file "<vault>/issues/pkm-002.md" is written with:
+      """
+      ---
+      title: second
+      status: open
+      labels: []
+      created_at: 2026-01-02T10:00
+      rank: 2
+      ---
+
+      ## Description
+      ## Notes
+      ## Comments
+      """
+    When I run `mt create --vault <vault> --top "comprar material"`
+    Then the exit code is 0
+    And stdout matches "^Created pkm-[0-9a-z]{4} \(rank 1\)\n$"
+    And the file "<vault>/issues/pkm-001.md" contains "rank: 2"
+    And the file "<vault>/issues/pkm-002.md" contains "rank: 3"
+    When I run `mt list --vault <vault>`
+    Then stdout matches "^○ pkm-[0-9a-z]{4}  comprar material\n○ pkm-001  first\n○ pkm-002  second\n$"
+
+  Scenario: create --bottom on an empty queue starts the queue at rank 1
+    When I run `mt create --vault <vault> --bottom "comprar material"`
+    Then the exit code is 0
+    And stdout matches "^Created pkm-[0-9a-z]{4} \(rank 1\)\n$"
+    When I run `mt list --vault <vault>`
+    Then stdout matches "^○ pkm-[0-9a-z]{4}  comprar material\n$"
+
+  Scenario: q --top places the new Issue first and prints only the ID
+    Given the file "<vault>/issues/pkm-001.md" is written with:
+      """
+      ---
+      title: first
+      status: open
+      labels: []
+      created_at: 2026-01-01T10:00
+      rank: 1
+      ---
+
+      ## Description
+      ## Notes
+      ## Comments
+      """
+    When I run `mt q --vault <vault> --top "ideia rapida"`
+    Then the exit code is 0
+    And stdout matches "^pkm-[0-9a-z]{4}\n$"
+    And I remember the issue ID
+    And the file "<vault>/issues/<id>.md" contains "rank: 1"
+    And the file "<vault>/issues/pkm-001.md" contains "rank: 2"
+
+  Scenario: q --bottom places the new Issue last and prints only the ID
+    Given the file "<vault>/issues/pkm-001.md" is written with:
+      """
+      ---
+      title: first
+      status: open
+      labels: []
+      created_at: 2026-01-01T10:00
+      rank: 1
+      ---
+
+      ## Description
+      ## Notes
+      ## Comments
+      """
+    And the file "<vault>/issues/pkm-002.md" is written with:
+      """
+      ---
+      title: second
+      status: open
+      labels: []
+      created_at: 2026-01-02T10:00
+      rank: 2
+      ---
+
+      ## Description
+      ## Notes
+      ## Comments
+      """
+    When I run `mt q --vault <vault> --bottom "ideia rapida"`
+    Then the exit code is 0
+    And stdout matches "^pkm-[0-9a-z]{4}\n$"
+    And I remember the issue ID
+    And the file "<vault>/issues/<id>.md" contains "rank: 3"
+    And the file "<vault>/issues/pkm-001.md" contains "rank: 1"
+    And the file "<vault>/issues/pkm-002.md" contains "rank: 2"
+
+  Scenario: create and q reject --top and --bottom together
+    When I run `mt create --vault <vault> --top --bottom "x"`
+    Then the exit code is 2
+    And stderr contains "--top and --bottom"
+    When I run `mt q --vault <vault> --top --bottom "x"`
+    Then the exit code is 2
+    And stderr contains "--top and --bottom"
+    And the directory "<vault>/issues" contains 0 files
+
   Scenario: show displays a rendered view
     When I run `mt create --vault <vault> "comprar material"`
     Then the exit code is 0

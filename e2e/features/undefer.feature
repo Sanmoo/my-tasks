@@ -2,7 +2,7 @@ Feature: Undefer issues
 
   mt undefer archives the deferral reminder: without an ID it sweeps the
   vault clearing deferred_until from every expired deferral (printing
-  one "Undeferred <id> (was <datetime>)" line per Issue); with an ID it
+  one "Undeferred <id> (was <datetime>): <title>" line per Issue); with an ID it
   clears one Issue even when its deferral is still in the future. Only
   the deferred_until field is touched. These scenarios cover the
   process: the compiled binary against a temporary Vault.
@@ -59,8 +59,8 @@ Feature: Undefer issues
     When I run `mt undefer --vault <vault>`
     Then the exit code is 0
     And stdout matches "(?s)Undeferred pkm-001.*Undeferred pkm-003"
-    And stdout contains "Undeferred pkm-001 (was 2000-01-01T00:00)"
-    And stdout contains "Undeferred pkm-003 (was 2000-01-01T00:00)"
+    And stdout contains "Undeferred pkm-001 (was 2000-01-01T00:00): expired"
+    And stdout contains "Undeferred pkm-003 (was 2000-01-01T00:00): expired too"
     And stdout does not contain "pkm-002"
     And the file "<vault>/issues/pkm-001.md" does not contain "deferred_until:"
     And the file "<vault>/issues/pkm-003.md" does not contain "deferred_until:"
@@ -102,8 +102,47 @@ Feature: Undefer issues
       """
     When I run `mt undefer --vault <vault> pkm-001`
     Then the exit code is 0
-    And stdout contains "Undeferred pkm-001 (was 2999-01-01T00:00)"
+    And stdout contains "Undeferred pkm-001 (was 2999-01-01T00:00): changed my mind"
     And the file "<vault>/issues/pkm-001.md" does not contain "deferred_until:"
+
+  Scenario: undefer collapses title whitespace in its confirmation
+    Given the file "<vault>/issues/pkm-001.md" is written with:
+      """
+      ---
+      title: "  line one\n line\t two  "
+      status: open
+      labels: []
+      created_at: 2026-01-01T10:00
+      deferred_until: 2999-01-01T00:00
+      ---
+
+      ## Description
+      ## Notes
+      ## Comments
+      """
+    When I run `mt undefer --vault <vault> pkm-001`
+    Then the exit code is 0
+    And stdout contains "Undeferred pkm-001 (was 2999-01-01T00:00): line one line two"
+
+  Scenario: undefer omits a suffix for a blank title
+    Given the file "<vault>/issues/pkm-001.md" is written with:
+      """
+      ---
+      title: "   "
+      status: open
+      labels: []
+      created_at: 2026-01-01T10:00
+      deferred_until: 2999-01-01T00:00
+      ---
+
+      ## Description
+      ## Notes
+      ## Comments
+      """
+    When I run `mt undefer --vault <vault> pkm-001`
+    Then the exit code is 0
+    And stdout contains "Undeferred pkm-001 (was 2999-01-01T00:00)"
+    And stdout does not contain "Undeferred pkm-001 (was 2999-01-01T00:00): "
 
   Scenario: undefer with an ID on an Issue without deferred_until fails
     Given the file "<vault>/issues/pkm-001.md" is written with:

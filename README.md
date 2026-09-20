@@ -202,15 +202,15 @@ mt defer pkm-055 +2d                  # relativo: +2d, +1w, +3h
 
 Arquiva o lembrete de uma Deferral, limpando só o campo `deferred_until`:
 Status e Rank ficam intocados. Sem ID, varre o Vault limpando todas as
-Deferrais expiradas e imprime `Undeferred <id> (was <datetime>)` por Issue
-(zero expiradas = saída vazia, exit 0). Com um ID, limpa uma Issue
+Deferrais expiradas e imprime `Undeferred <id> (was <datetime>): <título>`
+por Issue (zero expiradas = saída vazia, exit 0). Com um ID, limpa uma Issue
 específica mesmo com Deferral ainda futura — você mudou de ideia; uma Issue
 sem `deferred_until` falha com exit 1.
 
 ```sh
 mt undefer                 # limpa todas as Deferrais expiradas
 mt undefer pkm-055         # limpa só essa (mesmo se futura)
-# → Undeferred pkm-055 (was 2026-08-20T08:00)
+# → Undeferred pkm-055 (was 2026-08-20T08:00): revisar orçamento
 ```
 
 ### `mt dep add <id> <bloqueador>` | `mt dep rm <id> <bloqueador>`

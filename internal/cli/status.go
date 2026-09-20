@@ -118,15 +118,18 @@ func applyMutation(cmd *cobra.Command, vaultDir, id string, mutate func(issue.Is
 }
 
 // transitionLine renders the transition confirmation for id: "id is now
-// status", plus ": title" when the Issue has a title. Whitespace runs in
-// the title become single spaces so the confirmation stays a single line,
-// and a blank title keeps the line exactly as before.
+// status", plus the shared optional title suffix.
 func transitionLine(id string, i issue.Issue) string {
-	line := fmt.Sprintf("%s is now %s", id, i.Frontmatter.Status)
-	if t := strings.TrimSpace(strings.NewReplacer("\r\n", " ", "\r", " ", "\n", " ").Replace(i.Frontmatter.Title)); t != "" {
-		line += ": " + t
+	return fmt.Sprintf("%s is now %s%s", id, i.Frontmatter.Status, titleSuffix(i.Frontmatter.Title))
+}
+
+// titleSuffix returns ": title" when title has content. It collapses every
+// whitespace run to one space so confirmations always occupy one line.
+func titleSuffix(title string) string {
+	if title = strings.Join(strings.Fields(title), " "); title != "" {
+		return ": " + title
 	}
-	return line
+	return ""
 }
 
 // mutateIssue loads the Issue for id, applies mutate and persists the

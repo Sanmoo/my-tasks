@@ -60,12 +60,13 @@ func runUndeferOne(cmd *cobra.Command, id string) error {
 		return fmt.Errorf("issue %s has no deferred_until to undefer", id)
 	}
 	was := i.Frontmatter.DeferredUntil
-	if _, err := mutateIssue(vaultDir, id, func(i issue.Issue) issue.Issue {
+	i, err = mutateIssue(vaultDir, id, func(i issue.Issue) issue.Issue {
 		return i.Undefer()
-	}); err != nil {
+	})
+	if err != nil {
 		return err
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "Undeferred %s (was %s)\n", id, was)
+	fmt.Fprintf(cmd.OutOrStdout(), "%s\n", undeferLine(id, was, i))
 	return nil
 }
 
@@ -96,14 +97,20 @@ func runUndeferAll(cmd *cobra.Command) error {
 		}); err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "Undeferred %s (was %s)\n", it.ID, until)
+		fmt.Fprintf(out, "%s\n", undeferLine(it.ID, until, it.Issue))
 	}
 	return nil
 }
 
+// undeferLine renders the confirmation with the same optional title suffix
+// as status transitions.
+func undeferLine(id, was string, i issue.Issue) string {
+	return fmt.Sprintf("Undeferred %s (was %s)%s", id, was, titleSuffix(i.Frontmatter.Title))
+}
+
 const undeferLong = `undefer clears an Issue's deferred_until. Without an
 ID, it sweeps the vault: every expired deferral is cleared, printing one
-"Undeferred <id> (was <datetime>)" line per Issue — with nothing
+"Undeferred <id> (was <datetime>): <title>" line per Issue — with nothing
 expired, it prints nothing and succeeds. With an ID, it clears that one
 Issue even when its deferral is still in the future (you changed your
 mind). Only the deferred_until field is touched: Status and Rank stay as

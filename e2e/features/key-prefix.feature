@@ -232,6 +232,26 @@ Feature: Vault resolution by the issue ID prefix
     And stdout contains "dom-xyz is no longer blocked by pkm-999"
     And the file "<base>/vaults/dom/issues/dom-xyz.md" does not contain "blocked_by"
 
+  Scenario: undefer with an ID clears that Issue in the vault the prefix announces
+    Given the file "<base>/vaults/dom/issues/dom-xyz.md" is written with:
+      """
+      ---
+      title: dom issue
+      status: open
+      labels: []
+      created_at: 2026-01-01T10:00
+      deferred_until: 2999-01-01T00:00
+      ---
+
+      ## Description
+      ## Notes
+      ## Comments
+      """
+    When I run `mt undefer dom-xyz`
+    Then the exit code is 0
+    And stdout contains "Undeferred dom-xyz (was 2999-01-01T00:00)"
+    And the file "<base>/vaults/dom/issues/dom-xyz.md" does not contain "deferred_until"
+
   Scenario: undefer without an ID sweeps the default vault
     Given the file "<base>/vaults/pkm/issues/pkm-123.md" is written with:
       """

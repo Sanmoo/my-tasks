@@ -34,8 +34,9 @@ cmd/mt/            thin main: os.Exit(cli.Execute())
 internal/cli/      cobra wiring — process concerns (args, stdio, exit codes)
 internal/vault/    pure logic: global config (bookmarks + default, XDG, add/
                    remove/list round-trip), vault config (mt.yaml: prefix,
-                   status), vault resolution (@bookmark > --vault > default),
-                   @-token extraction, ~ expansion, ID-prefix derivation
+                   status), vault resolution (@bookmark > --vault > default,
+                   plus the ID-prefix step for key commands), @-token
+                   extraction, ~ expansion, ID-prefix derivation
 internal/issue/    pure logic: the Issue frontmatter round-trip (stable field
                    order, optional fields only-when-set, no id/updated_at)
                    and ID generation (prefix + short random suffix, collision
@@ -94,9 +95,17 @@ scripts/           coverage-gate.sh
 
 ## Vault addressing convention
 
-- Vault-requiring commands address the vault by `@bookmark`, `--vault <path>`,
-  or the default bookmark in the global config (`@bookmark` > `--vault` >
-  `default`); with none, the command fails with instructions (exit 1).
+- Commands that take an issue key address the vault by `@bookmark`, `--vault
+  <path>`, the key's ID prefix, or the default bookmark in the global config
+  (`@bookmark` > `--vault` > ID prefix > `default`): the ID prefix is the part
+  of the key before the first '-', matched case-sensitively against each
+  bookmarked vault's `mt.yaml` `prefix:` (unreadable configs skipped, aliases
+  deduplicated by path). An explicit selection always wins; a prefix matching
+  several vaults fails listing the bookmarks; a key without a '-' or without a
+  match falls back to the default bookmark with the messages of the
+  three-step convention. Commands without a key keep exactly `@bookmark` >
+  `--vault` > `default`; with none, the command fails with instructions
+  (exit 1).
 - The `@bookmark` token (regex `@[A-Za-z0-9_-]+`) may appear anywhere among a
   command's positional arguments and is extracted before command parsing;
   at most one is allowed, and bookmark names must not start with `@`.

@@ -410,10 +410,39 @@ O bookmark padrão é definido pela chave `default:` da config global.
 ### `mt help [comando]`
 
 `mt help` (ou `--help`) mostra a ajuda raiz; `mt help <comando>` mostra a
-ajuda do comando. Tópico desconhecido é erro de uso (exit 2). O comando
-auxiliar `mt completion <shell>` (adicionado pelo Cobra) gera scripts de
-completação para o shell. `mt` sem comando não mostra mais a ajuda: lista as
-Issues `in_progress` do vault resolvido (ver [`mt list`](#mt-list)).
+ajuda do comando. Tópico desconhecido é erro de uso (exit 2). `mt` sem
+comando não mostra mais a ajuda: lista as Issues `in_progress` do vault
+resolvido (ver [`mt list`](#mt-list)).
+
+### Completação (TAB)
+
+Os comandos que recebem uma issue ID completam as IDs do vault pelo
+prefixo digitado (case-insensitive): `mt show dom-ab<TAB>` lista as IDs que
+começam com `dom-ab`, e `mt show dom-abk<TAB>` completa `dom-abkg` quando é
+única. A resolução do vault é exatamente a dos comandos
+(`@bookmark` > `--vault` > prefixo da ID > `default`); prefixo ambíguo ou
+sem vault devolvem zero candidatos — o TAB fica mudo e o erro do comando
+aparece na execução. `mt dep add|rm <id> <bloqueador><TAB>` completa o
+bloqueador no vault do sujeito. Posições que não são ID (`<status>`,
+`<when>`, `<n>`, `<text>`) não completam.
+
+O script de completação é gerado pelo próprio `mt` — instale uma vez por
+shell, no arquivo de configuração dele (o zsh precisa de `autoload -U
+compinit; compinit` uma vez):
+
+```sh
+# zsh
+source <(mt completion zsh)          # sessão atual
+mt completion zsh > "${fpath[1]}/_mt"   # permanente
+
+# bash (precisa do pacote bash-completion)
+source <(mt completion bash)         # sessão atual
+sudo mt completion bash > /etc/bash_completion.d/mt   # permanente (Linux)
+
+# fish
+mt completion fish | source          # sessão atual
+mt completion fish > ~/.config/fish/completions/mt.fish   # permanente
+```
 
 ## Configuração global
 

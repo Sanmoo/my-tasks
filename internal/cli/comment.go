@@ -32,6 +32,7 @@ The existing body is preserved byte-for-byte (append-only).`,
 			}
 			return nil
 		},
+		ValidArgsFunction: completeIssueID,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			t, err := resolveVaultForKey(cmd, args[0])
 			if err != nil {

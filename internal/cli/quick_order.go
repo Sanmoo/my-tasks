@@ -32,6 +32,7 @@ func newQuickOrderCmd(name, short string, action priority.QuickAction) *cobra.Co
 			}
 			return nil
 		},
+		ValidArgsFunction: completeIssueID,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runQuickOrder(cmd, args[0], action, 0)
 		},
@@ -55,6 +56,7 @@ func newRankCmd() *cobra.Command {
 			}
 			return nil
 		},
+		ValidArgsFunction: completeIssueID,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			position, err := strconv.Atoi(args[1])
 			if err != nil || position < 1 {

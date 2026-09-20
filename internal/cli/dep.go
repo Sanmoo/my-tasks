@@ -40,7 +40,8 @@ func newDepAddCmd() *cobra.Command {
 blocked — hidden from ready and pick-next, marked [blocked] in list —
 until the blocker is done. The blocker must be an existing Issue of the
 same Vault, and may not be the Issue itself.`,
-		Args: depArgs("dep add"),
+		Args:               depArgs("dep add"),
+		ValidArgsFunction: completeIssueID,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runDepAdd(cmd, args[0], args[1])
 		},
@@ -57,7 +58,8 @@ func newDepRmCmd() *cobra.Command {
 idempotent: removing a blocker that does not block the Issue leaves it
 untouched, so stale references (e.g. to a deleted Issue) can be cleaned
 up.`,
-		Args: depArgs("dep rm"),
+		Args:               depArgs("dep rm"),
+		ValidArgsFunction: completeIssueID,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runDepRm(cmd, args[0], args[1])
 		},

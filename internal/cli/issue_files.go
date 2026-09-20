@@ -54,6 +54,29 @@ func readIssueData(vaultDir, id string) ([]byte, error) {
 	return data, nil
 }
 
+// issueIDs lists the existing Issue IDs of a vault: the issues/*.md
+// file names with the suffix stripped, skipping directories. ReadDir
+// sorts by name, so the list is deterministic. It is the shared
+// enumeration behind ID allocation (newIssueID) and shell completion
+// (completeIssueID) — mechanical process logic, no domain decisions.
+func issueIDs(vaultDir string) ([]string, error) {
+	entries, err := os.ReadDir(filepath.Join(vaultDir, "issues"))
+	if err != nil {
+		return nil, fmt.Errorf("reading issues directory: %w", err)
+	}
+	ids := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if strings.HasSuffix(name, ".md") {
+			ids = append(ids, strings.TrimSuffix(name, ".md"))
+		}
+	}
+	return ids, nil
+}
+
 func readIssueFiles(vaultDir string) ([]parsedIssueFile, error) {
 	dir := filepath.Join(vaultDir, "issues")
 	entries, err := os.ReadDir(dir)

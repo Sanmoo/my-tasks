@@ -223,6 +223,7 @@ func newShowCmd() *cobra.Command {
 			}
 			return nil
 		},
+		ValidArgsFunction: completeIssueID,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			t, err := resolveVaultForKey(cmd, args[0])
 			if err != nil {
@@ -266,6 +267,7 @@ func newEditCmd() *cobra.Command {
 			}
 			return nil
 		},
+		ValidArgsFunction: completeIssueID,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			t, err := resolveVaultForKey(cmd, args[0])
 			if err != nil {
@@ -314,19 +316,13 @@ func checkID(id string) error {
 // newIssueID allocates an ID for a new Issue: the vault prefix plus a
 // random suffix that does not collide with any existing issue file.
 func newIssueID(prefix, vaultDir string) (string, error) {
-	entries, err := os.ReadDir(filepath.Join(vaultDir, "issues"))
+	ids, err := issueIDs(vaultDir)
 	if err != nil {
-		return "", fmt.Errorf("reading issues directory: %w", err)
+		return "", err
 	}
-	taken := make(map[string]bool, len(entries))
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		name := e.Name()
-		if strings.HasSuffix(name, ".md") {
-			taken[strings.TrimSuffix(name, ".md")] = true
-		}
+	taken := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		taken[id] = true
 	}
 	return issue.NextID(prefix, taken, rand.Reader)
 }

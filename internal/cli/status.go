@@ -31,6 +31,7 @@ func newDoneCmd() *cobra.Command {
 			}
 			return nil
 		},
+		ValidArgsFunction: completeIssueID,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runMutation(cmd, args[0], func(i issue.Issue) issue.Issue {
 				return i.Done(time.Now().Format(issue.NaiveLayout))
@@ -51,6 +52,7 @@ func newReopenCmd() *cobra.Command {
 			}
 			return nil
 		},
+		ValidArgsFunction: completeIssueID,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runMutation(cmd, args[0], func(i issue.Issue) issue.Issue {
 				return i.Reopen()
@@ -71,6 +73,7 @@ func newStatusCmd() *cobra.Command {
 			}
 			return nil
 		},
+		ValidArgsFunction: completeIssueID,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			t, err := resolveVaultForKey(cmd, args[0])
 			if err != nil {

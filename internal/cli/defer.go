@@ -31,6 +31,7 @@ func newDeferCmd() *cobra.Command {
 			}
 			return nil
 		},
+		ValidArgsFunction: completeIssueID,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// The time may be spelled "26-08-20 08:00" as one quoted
 			// argument or two; join the remainder so both forms parse.

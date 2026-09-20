@@ -4,7 +4,7 @@ Projeto `my-tasks2`: issue tracker pessoal git-friendly (`mt`), uma issue por ar
 
 ## Worktree workflow
 
-Todo trabalho de implementação roda num worktree isolado; `main` só avança por merges fast-forward. **Definition of done:** só declare a implementação concluída depois de executar toda a sequência **Finish**, com o commit integrado em `main` e `git worktree list` mostrando apenas o checkout principal. Um commit na branch do ticket é um checkpoint, não a entrega concluída.
+Todo trabalho de implementação roda num worktree isolado; `main` só avança por merges fast-forward. **Definition of done:** só declare a implementação concluída depois de executar toda a sequência **Finish**, com o commit integrado em `main` e o worktree e a branch deste ticket removidos. Um commit na branch do ticket é um checkpoint, não a entrega concluída.
 
 Start — no checkout principal, com `main` atual:
 
@@ -19,7 +19,7 @@ Finish:
     git worktree remove .worktrees/<slug>
     git branch -d <slug>
 
-O rebase garante o fast-forward; se o `--ff-only` falhar, volte ao rebase — nunca force. Worktrees paralelos convivem: o rebase do finish absorve o que entrou na `main` enquanto isso. Confira o fim com `git worktree list` (apenas o checkout principal).
+O rebase garante o fast-forward; se o `--ff-only` falhar, volte ao rebase — nunca force. Worktrees paralelos convivem: o rebase do finish absorve o que entrou na `main` enquanto isso. Confira o fim com `git worktree list`: o worktree deste ticket deve ter sumido; sem tickets paralelos, resta apenas o checkout principal.
 
 ## Agent skills
 

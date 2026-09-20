@@ -4,7 +4,7 @@ Projeto `my-tasks2`: issue tracker pessoal git-friendly (`mt`), uma issue por ar
 
 ## Worktree workflow
 
-Todo trabalho de implementação roda num worktree isolado; `main` só avança por merges fast-forward.
+Todo trabalho de implementação roda num worktree isolado; `main` só avança por merges fast-forward. **Definition of done:** só declare a implementação concluída depois de executar toda a sequência **Finish**, com o commit integrado em `main` e `git worktree list` mostrando apenas o checkout principal. Um commit na branch do ticket é um checkpoint, não a entrega concluída.
 
 Start — no checkout principal, com `main` atual:
 

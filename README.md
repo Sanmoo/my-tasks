@@ -427,20 +427,20 @@ bloqueador no vault do sujeito. Posições que não são ID (`<status>`,
 `<when>`, `<n>`, `<text>`) não completam.
 
 O script de completação é gerado pelo próprio `mt` — instale uma vez por
-shell, no arquivo de configuração dele (o zsh precisa de `autoload -U
-compinit; compinit` uma vez):
+shell, no arquivo de configuração dele:
 
 ```sh
-# zsh
-source <(mt completion zsh)          # sessão atual
-mt completion zsh > "${fpath[1]}/_mt"   # permanente
+# zsh (precisa de compinit — execute uma vez):
+# echo "autoload -U compinit; compinit" >> ~/.zshrc
+source <(mt completion zsh)                      # sessão atual
+mt completion zsh > "${fpath[1]}/_mt"               # permanente
 
 # bash (precisa do pacote bash-completion)
-source <(mt completion bash)         # sessão atual
+source <(mt completion bash)                     # sessão atual
 sudo mt completion bash > /etc/bash_completion.d/mt   # permanente (Linux)
 
 # fish
-mt completion fish | source          # sessão atual
+mt completion fish | source                      # sessão atual
 mt completion fish > ~/.config/fish/completions/mt.fish   # permanente
 ```
 

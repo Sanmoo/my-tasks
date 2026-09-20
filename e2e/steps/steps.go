@@ -105,6 +105,7 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^stdout contains "([^"]*)"$`, stdoutContains)
 	sc.Step(`^stdout is empty$`, stdoutIsEmpty)
 	sc.Step(`^stdout does not contain "([^"]*)"$`, stdoutDoesNotContain)
+	sc.Step(`^stderr does not contain "([^"]*)"$`, stderrDoesNotContain)
 	sc.Step(`^the environment variable "([^"]*)" is "([^"]*)"$`, envVarIs)
 	sc.Step(`^stdout matches "([^"]*)"$`, stdoutMatches)
 	sc.Step(`^stderr contains "([^"]*)"$`, stderrContains)
@@ -394,6 +395,21 @@ func stdoutDoesNotContain(ctx context.Context, want string) (context.Context, er
 	want = st.expand(want)
 	if strings.Contains(st.result.Stdout, want) {
 		return ctx, fmt.Errorf("stdout contains %q (want it absent):\n%s", want, st.result.Stdout)
+	}
+	return ctx, nil
+}
+
+func stderrDoesNotContain(ctx context.Context, want string) (context.Context, error) {
+	st, err := stateFrom(ctx)
+	if err != nil {
+		return ctx, err
+	}
+	if err := st.requireResult(); err != nil {
+		return ctx, err
+	}
+	want = st.expand(want)
+	if strings.Contains(st.result.Stderr, want) {
+		return ctx, fmt.Errorf("stderr contains %q (want it absent):\n%s", want, st.result.Stderr)
 	}
 	return ctx, nil
 }

@@ -72,11 +72,11 @@ func newStatusCmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			vaultDir, err := resolveVault(cmd)
+			t, err := resolveVaultForKey(cmd, args[0])
 			if err != nil {
 				return err
 			}
-			vcfg, err := vault.LoadVault(vaultDir)
+			vcfg, err := vault.LoadVault(t.dir)
 			if err != nil {
 				return fmt.Errorf("loading vault: %w", err)
 			}
@@ -84,22 +84,22 @@ func newStatusCmd() *cobra.Command {
 				return fmt.Errorf("status %q is not in the vault's status list (valid: %s)",
 					args[1], strings.Join(vcfg.StatusList(), ", "))
 			}
-			return applyMutation(cmd, vaultDir, args[0], func(i issue.Issue) issue.Issue {
+			return applyMutation(cmd, t, args[0], func(i issue.Issue) issue.Issue {
 				return i.SetStatus(args[1])
 			})
 		},
 	}
 }
 
-// runMutation is the shared body of done and reopen: resolve the vault,
-// then apply the mutation to the Issue. resolveVault's errors already
-// name the failing step, so they propagate unwrapped.
+// runMutation is the shared body of done and reopen: resolve the vault
+// from the key, then apply the mutation to the Issue. Resolution errors
+// already name the failing step, so they propagate unwrapped.
 func runMutation(cmd *cobra.Command, id string, mutate func(issue.Issue) issue.Issue) error {
-	vaultDir, err := resolveVault(cmd)
+	t, err := resolveVaultForKey(cmd, id)
 	if err != nil {
 		return err
 	}
-	if err := applyMutation(cmd, vaultDir, id, mutate); err != nil {
+	if err := applyMutation(cmd, t, id, mutate); err != nil {
 		return fmt.Errorf("mutating issue: %w", err)
 	}
 	return nil
@@ -108,8 +108,8 @@ func runMutation(cmd *cobra.Command, id string, mutate func(issue.Issue) issue.I
 // applyMutation applies and persists a mutation, then prints the new
 // status — with the Issue's title when it has one. It is the shared
 // tail of done, reopen, status and pick-next.
-func applyMutation(cmd *cobra.Command, vaultDir, id string, mutate func(issue.Issue) issue.Issue) error {
-	i, err := mutateIssue(vaultDir, id, mutate)
+func applyMutation(cmd *cobra.Command, t vaultTarget, id string, mutate func(issue.Issue) issue.Issue) error {
+	i, err := mutateIssue(t, id, mutate)
 	if err != nil {
 		return err
 	}
@@ -133,30 +133,35 @@ func titleSuffix(title string) string {
 }
 
 // mutateIssue loads the Issue for id, applies mutate and persists the
-// result. Callers own any command-specific confirmation output.
-func mutateIssue(vaultDir, id string, mutate func(issue.Issue) issue.Issue) (issue.Issue, error) {
+// result. Callers own any command-specific confirmation output. When
+// the Issue is missing, the error carries the target's vault context
+// (prefix-picked vault named, or hint for explicit selections).
+func mutateIssue(t vaultTarget, id string, mutate func(issue.Issue) issue.Issue) (issue.Issue, error) {
 	if err := checkID(id); err != nil {
 		return issue.Issue{}, err
 	}
-	i, err := readIssue(vaultDir, id)
+	i, err := readIssue(t, id)
 	if err != nil {
 		return issue.Issue{}, err
 	}
 	i = mutate(i)
-	if err := writeIssueFile(vaultDir, id, i); err != nil {
+	if err := writeIssueFile(t.dir, id, i); err != nil {
 		return issue.Issue{}, err
 	}
 	return i, nil
 }
 
-// readIssue loads and parses the Issue file for id inside vaultDir.
-// O_NOFOLLOW keeps a symlink in the issues directory from redirecting the
-// read outside the Vault, including if the path changes after discovery.
-func readIssue(vaultDir, id string) (issue.Issue, error) {
-	data, err := readIssueData(vaultDir, id)
+// readIssue loads and parses the Issue file for id in the target
+// vault; a missing Issue produces the target's not-found error, which
+// names the vault the key's prefix picked and appends the hint for
+// explicit selections. O_NOFOLLOW keeps a symlink in the issues
+// directory from redirecting the read outside the Vault, including if
+// the path changes after discovery.
+func readIssue(t vaultTarget, id string) (issue.Issue, error) {
+	data, err := readIssueData(t.dir, id)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return issue.Issue{}, fmt.Errorf("issue %s not found", id)
+			return issue.Issue{}, t.notFoundError(id)
 		}
 		return issue.Issue{}, fmt.Errorf("reading issue %s: %w", id, err)
 	}

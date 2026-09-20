@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -166,21 +167,16 @@ func unknownHelpTopic(words []string) error {
 
 // resolveVault resolves the vault path for a vault-requiring command
 // under the @bookmark > --vault > default precedence. The global config
-// is auto-detected (XDG). Vault-requiring commands land in later
-// tickets (create/show/edit, list, ...); this helper is their shared
-// entry point.
+// is auto-detected (XDG). It is the entry point of the commands that
+// take no issue key; key commands resolve through resolveVaultForKey.
 func resolveVault(cmd *cobra.Command) (string, error) {
 	vaultFlag, err := cmd.Flags().GetString("vault")
 	if err != nil {
 		return "", fmt.Errorf("reading --vault flag: %w", err)
 	}
-	path, home, err := globalConfigPath()
+	global, home, err := loadGlobalConfig()
 	if err != nil {
-		return "", fmt.Errorf("locating global config: %w", err)
-	}
-	global, err := vault.LoadGlobal(path)
-	if err != nil {
-		return "", fmt.Errorf("loading global config: %w", err)
+		return "", err
 	}
 	resolved, err := vault.Resolve(bookmark, vaultFlag, global, home)
 	if err != nil {
@@ -189,12 +185,138 @@ func resolveVault(cmd *cobra.Command) (string, error) {
 	return resolved, nil
 }
 
+// loadGlobalConfig loads the auto-detected global config (XDG) and
+// returns it with the home directory its paths expand against.
+func loadGlobalConfig() (vault.Global, string, error) {
+	path, home, err := globalConfigPath()
+	if err != nil {
+		return vault.Global{}, "", fmt.Errorf("locating global config: %w", err)
+	}
+	global, err := vault.LoadGlobal(path)
+	if err != nil {
+		return vault.Global{}, "", fmt.Errorf("loading global config: %w", err)
+	}
+	return global, home, nil
+}
+
+// vaultTarget is the vault a key command runs against, plus the
+// message context its not-found errors need: how the vault was picked
+// decides whether an error names the vault, suggests another, or stays
+// exactly as before.
+type vaultTarget struct {
+	// dir is the vault directory the command operates on.
+	dir string
+	// byPrefix is the bookmark whose vault the key's ID prefix picked, ""
+	// when the selection was explicit, defaulted or absent.
+	byPrefix string
+	// explicit is the "@name" or --vault path the user picked
+	// explicitly, "" when the vault came from the prefix or default.
+	explicit string
+	// hint is the "hint: ..." line for an explicit selection whose key
+	// prefix matches a different bookmarked vault, "" when none.
+	hint string
+}
+
+// resolveVaultForKey resolves the vault of a key command under the
+// @bookmark > --vault > ID prefix > default precedence: an explicit
+// selection behaves exactly like resolveVault — the key's prefix never
+// overrides it — and the prefix (the part of the key before the first
+// '-') only replaces the default step. A prefix matching several
+// bookmarks is ambiguous and errors listing them; with no match the
+// resolution falls back to the default bookmark, messages included.
+func resolveVaultForKey(cmd *cobra.Command, key string) (vaultTarget, error) {
+	vaultFlag, err := cmd.Flags().GetString("vault")
+	if err != nil {
+		return vaultTarget{}, fmt.Errorf("reading --vault flag: %w", err)
+	}
+	global, home, err := loadGlobalConfig()
+	if err != nil {
+		return vaultTarget{}, err
+	}
+	if bookmark != "" || vaultFlag != "" {
+		dir, err := vault.Resolve(bookmark, vaultFlag, global, home)
+		if err != nil {
+			return vaultTarget{}, fmt.Errorf("resolving vault: %w", err)
+		}
+		t := vaultTarget{dir: dir}
+		if bookmark != "" {
+			t.explicit = "@" + bookmark
+		} else {
+			t.explicit = dir
+		}
+		t.hint = prefixHint(global, home, key, bookmark, dir)
+		return t, nil
+	}
+	matches := vault.MatchByPrefix(key, global, home)
+	switch len(matches) {
+	case 1:
+		return vaultTarget{dir: matches[0].Path, byPrefix: matches[0].Bookmark}, nil
+	case 0:
+		dir, err := vault.Resolve("", "", global, home)
+		if err != nil {
+			return vaultTarget{}, fmt.Errorf("resolving vault: %w", err)
+		}
+		return vaultTarget{dir: dir}, nil
+	default:
+		return vaultTarget{}, ambiguousPrefixError(cmd, key, matches)
+	}
+}
+
+// prefixHint returns the "hint: the prefix … suggests vault @…" line
+// for an explicit selection, when the key's prefix matches a bookmark
+// the user did not already pick. An explicit selection is never
+// second-guessed: a hint only appears when it points somewhere
+// different. Empty when the key has no prefix or no such bookmark
+// exists.
+func prefixHint(global vault.Global, home, key, explicitBookmark, explicitDir string) string {
+	for _, m := range vault.MatchByPrefix(key, global, home) {
+		if m.Bookmark == explicitBookmark || filepath.Clean(m.Path) == filepath.Clean(explicitDir) {
+			continue
+		}
+		prefix, _ := vault.PrefixOf(key)
+		return fmt.Sprintf("hint: the prefix %q suggests vault @%s", prefix, m.Bookmark)
+	}
+	return ""
+}
+
+// ambiguousPrefixError builds the error for a key whose prefix matches
+// several bookmarks: it lists them — never choosing silently — and
+// shows the explicit invocation that disambiguates.
+func ambiguousPrefixError(cmd *cobra.Command, key string, matches []vault.KeyVault) error {
+	prefix, _ := vault.PrefixOf(key)
+	names := make([]string, 0, len(matches))
+	for _, m := range matches {
+		names = append(names, "@"+m.Bookmark)
+	}
+	suggestion := fmt.Sprintf("%s @%s %s", cmd.CommandPath(), matches[0].Bookmark, key)
+	return fmt.Errorf("key %s is ambiguous: bookmarks %s both use prefix %q — pick one explicitly: %s",
+		key, strings.Join(names, " and "), prefix, suggestion)
+}
+
+// notFoundError builds the "issue <id> not found" error of a key
+// command: it names the vault the key's prefix selected — so the user
+// knows resolution jumped there — or the explicit selection, appending
+// the hint when one applies. The fallback case (no prefix match) keeps
+// today's message exactly.
+func (t vaultTarget) notFoundError(id string) error {
+	switch {
+	case t.byPrefix != "":
+		return fmt.Errorf("issue %s not found in @%s", id, t.byPrefix)
+	case t.hint != "":
+		return fmt.Errorf("issue %s not found in %s\n%s", id, t.explicit, t.hint)
+	default:
+		return fmt.Errorf("issue %s not found", id)
+	}
+}
+
 const rootLong = `mt is a personal, git-friendly issue tracker: one Markdown file per Issue,
 one Vault per domain, everything versioned in Git.
 
-Vaults are addressed by @bookmark, --vault <path>, or the default
-bookmark in the global config. With none of them, vault-requiring
-commands fail with instructions.
+Vaults are addressed by @bookmark, --vault <path>, the ID prefix of
+an issue key (e.g. dom-xyz picks the vault whose prefix is dom), or
+the default bookmark in the global config. An explicit @bookmark or
+--vault always wins; with none of them, vault-requiring commands
+fail with instructions.
 
 Bare mt (no command) shows the resolved vault's in_progress Issues,
 like 'mt list --status in_progress'. 'mt help' and 'mt --help' show

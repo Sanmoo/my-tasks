@@ -50,7 +50,7 @@ func runPickNext(cmd *cobra.Command) error {
 	if err != nil {
 		return fmt.Errorf("selecting next issue: %w", err)
 	}
-	if err := applyMutation(cmd, vaultDir, next.ID, func(i issue.Issue) issue.Issue {
+	if err := applyMutation(cmd, vaultTarget{dir: vaultDir}, next.ID, func(i issue.Issue) issue.Issue {
 		return i.Start(now.Format(issue.NaiveLayout))
 	}); err != nil {
 		return fmt.Errorf("starting issue: %w", err)

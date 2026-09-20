@@ -6,11 +6,13 @@ package cli
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
 	"github.com/Sanmoo/my-tasks2/internal/exitcode"
 	"github.com/Sanmoo/my-tasks2/internal/issue"
+	"github.com/Sanmoo/my-tasks2/internal/vault"
 )
 
 // newDepCmd builds `mt dep`: the parent of add and rm. A bare `mt dep`
@@ -77,25 +79,32 @@ func depArgs(use string) cobra.PositionalArgs {
 	}
 }
 
-// runDepAdd records blocker in id's blocked_by. The subject and the
-// blocker must both exist in the Vault, and a blocker may not be the
-// Issue itself — well-formed invocations that fail against the current
-// state are user errors (exit 1), like any issue-not-found.
+// runDepAdd records blocker in id's blocked_by. The subject's vault is
+// resolved by the key's ID prefix like every key command; the blocker's
+// prefix is consulted only by the same-vault guard — never to address
+// the blocker — so the intra-vault rule of blocked_by holds under
+// prefix resolution. The subject and the blocker must both exist in
+// the subject's Vault, and a blocker may not be the Issue itself —
+// well-formed invocations that fail against the current state are
+// user errors (exit 1), like any issue-not-found.
 func runDepAdd(cmd *cobra.Command, id, blocker string) error {
-	vaultDir, err := resolveVault(cmd)
+	t, err := resolveVaultForKey(cmd, id)
 	if err != nil {
 		return err
 	}
-	if _, err := readIssue(vaultDir, id); err != nil {
+	if err := checkSameVaultBlocker(t.dir, blocker); err != nil {
 		return err
 	}
-	if _, err := readIssue(vaultDir, blocker); err != nil {
+	if _, err := readIssue(t, id); err != nil {
+		return err
+	}
+	if _, err := readIssue(t, blocker); err != nil {
 		return err
 	}
 	if blocker == id {
 		return fmt.Errorf("issue %s cannot block itself", id)
 	}
-	if _, err := mutateIssue(vaultDir, id, func(i issue.Issue) issue.Issue {
+	if _, err := mutateIssue(t, id, func(i issue.Issue) issue.Issue {
 		return i.AddBlocker(blocker)
 	}); err != nil {
 		return err
@@ -104,15 +113,37 @@ func runDepAdd(cmd *cobra.Command, id, blocker string) error {
 	return nil
 }
 
-// runDepRm removes blocker from id's blocked_by. The blocker need not
-// exist in the Vault: removing a stale reference is a legitimate
-// cleanup, and the edit is idempotent when the blocker is not listed.
-func runDepRm(cmd *cobra.Command, id, blocker string) error {
-	vaultDir, err := resolveVault(cmd)
+// checkSameVaultBlocker enforces the intra-vault rule of blocked_by: a
+// blocker whose ID prefix matches a bookmarked vault other than dir is
+// rejected, naming the vault it belongs to. A prefix matching only the
+// subject's vault (or nothing) leaves the blocker to be looked up in
+// the subject's vault, exactly as before prefix resolution.
+func checkSameVaultBlocker(dir, blocker string) error {
+	global, home, err := loadGlobalConfig()
 	if err != nil {
 		return err
 	}
-	if _, err := mutateIssue(vaultDir, id, func(i issue.Issue) issue.Issue {
+	for _, m := range vault.MatchByPrefix(blocker, global, home) {
+		if filepath.Clean(m.Path) == filepath.Clean(dir) {
+			continue
+		}
+		return fmt.Errorf("blocker %s belongs to @%s — blocked_by requires the same vault", blocker, m.Bookmark)
+	}
+	return nil
+}
+
+// runDepRm removes blocker from id's blocked_by. Only the subject
+// resolves by its ID prefix; the blocker is a bare name to remove, as
+// today — cleaning a stale reference stays idempotent even when the
+// blocker belongs to another vault. The blocker need not exist in the
+// Vault: removing a stale reference is a legitimate cleanup, and the
+// edit is idempotent when the blocker is not listed.
+func runDepRm(cmd *cobra.Command, id, blocker string) error {
+	t, err := resolveVaultForKey(cmd, id)
+	if err != nil {
+		return err
+	}
+	if _, err := mutateIssue(t, id, func(i issue.Issue) issue.Issue {
 		return i.RemoveBlocker(blocker)
 	}); err != nil {
 		return err

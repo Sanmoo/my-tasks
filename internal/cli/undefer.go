@@ -45,14 +45,14 @@ func newUndeferCmd() *cobra.Command {
 // when the deferral is still in the future. An Issue without the field
 // is a user error (exit 1): the target is wrong.
 func runUndeferOne(cmd *cobra.Command, id string) error {
-	vaultDir, err := resolveVault(cmd)
+	t, err := resolveVaultForKey(cmd, id)
 	if err != nil {
 		return err
 	}
 	if err := checkID(id); err != nil {
 		return err
 	}
-	i, err := readIssue(vaultDir, id)
+	i, err := readIssue(t, id)
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func runUndeferOne(cmd *cobra.Command, id string) error {
 		return fmt.Errorf("issue %s has no deferred_until to undefer", id)
 	}
 	was := i.Frontmatter.DeferredUntil
-	i, err = mutateIssue(vaultDir, id, func(i issue.Issue) issue.Issue {
+	i, err = mutateIssue(t, id, func(i issue.Issue) issue.Issue {
 		return i.Undefer()
 	})
 	if err != nil {
@@ -92,7 +92,7 @@ func runUndeferAll(cmd *cobra.Command) error {
 		if !list.DeferralExpired(until, now) {
 			continue
 		}
-		if _, err := mutateIssue(vaultDir, it.ID, func(i issue.Issue) issue.Issue {
+		if _, err := mutateIssue(vaultTarget{dir: vaultDir}, it.ID, func(i issue.Issue) issue.Issue {
 			return i.Undefer()
 		}); err != nil {
 			return err

@@ -33,7 +33,7 @@ The existing body is preserved byte-for-byte (append-only).`,
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			vaultDir, err := resolveVault(cmd)
+			t, err := resolveVaultForKey(cmd, args[0])
 			if err != nil {
 				return err
 			}
@@ -42,15 +42,15 @@ The existing body is preserved byte-for-byte (append-only).`,
 				return err
 			}
 			text := strings.Join(args[1:], " ")
-			return appendComment(vaultDir, id, text)
+			return appendComment(t, id, text)
 		},
 	}
 }
 
 // appendComment loads the Issue for id, appends a timestamped comment with
 // a fresh stable anchor and writes it back.
-func appendComment(vaultDir, id, text string) error {
-	i, err := readIssue(vaultDir, id)
+func appendComment(t vaultTarget, id, text string) error {
+	i, err := readIssue(t, id)
 	if err != nil {
 		return err
 	}
@@ -59,5 +59,5 @@ func appendComment(vaultDir, id, text string) error {
 		return err
 	}
 	i.Body = issue.AppendComment(i.Body, time.Now().Format(issue.NaiveLayout), text, anchor)
-	return writeIssueFile(vaultDir, id, i)
+	return writeIssueFile(t.dir, id, i)
 }

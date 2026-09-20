@@ -16,6 +16,10 @@ _Avoid_: área, projeto, repositório
 Um apelido curto que aponta para um vault, definido em um arquivo de configuração detectado automaticamente. Usado como `@nome` nos comandos. Um dos bookmarks pode ser o favorito principal, usado quando nenhum `@` é informado.
 _Avoid_: área, atalho, alias
 
+**ID prefix**:
+A parte de uma issue ID antes do primeiro `-` (ex.: `dom` em `dom-xyz`); identifica o vault a que a Issue pertence: nos comandos que recebem uma key, quando nenhum `@bookmark` ou `--vault` é dado, o vault é resolvido pelo prefixo antes de recorrer ao bookmark default.
+_Avoid_: prefixo-do-vault
+
 **Rank**:
 A posição de uma issue na ordem de prioridade dentro de um vault. Inteiro, único por vault, menor = primeiro. Issue sem rank pertence ao Backlog.
 _Avoid_: prioridade, ordem (ordem é a sequência resultante; rank é o valor que a produz)

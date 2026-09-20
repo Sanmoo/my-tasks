@@ -160,7 +160,7 @@ func applyRankChange(vaultDir string, ch priority.Change) error {
 	if err := checkID(ch.ID); err != nil {
 		return err
 	}
-	i, err := readIssue(vaultDir, ch.ID)
+	i, err := readIssue(vaultTarget{dir: vaultDir}, ch.ID)
 	if err != nil {
 		return err
 	}

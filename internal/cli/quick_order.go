@@ -66,21 +66,27 @@ func newRankCmd() *cobra.Command {
 }
 
 // runQuickOrder applies a pure quick-order plan and rewrites only the Issues
-// whose ranks changed, just like `mt prioritize`.
+// whose ranks changed, just like `mt prioritize`. When the key's prefix
+// picked the vault — or a hint applies to an explicit selection — a missing
+// Issue fails naming the vault; the fallback (no prefix match) keeps the
+// plan's own message.
 func runQuickOrder(cmd *cobra.Command, id string, action priority.QuickAction, position int) error {
-	vaultDir, err := resolveVault(cmd)
+	t, err := resolveVaultForKey(cmd, id)
 	if err != nil {
 		return err
 	}
-	issues, err := loadPriorityIssues(vaultDir)
+	issues, err := loadPriorityIssues(t.dir)
 	if err != nil {
 		return err
+	}
+	if (t.byPrefix != "" || t.hint != "") && !containsIssue(issues, id) {
+		return t.notFoundError(id)
 	}
 	changes, err := priority.QuickPlan(issues, id, action, position)
 	if err != nil {
 		return err
 	}
-	if err := applyRankChanges(vaultDir, changes); err != nil {
+	if err := applyRankChanges(t.dir, changes); err != nil {
 		return err
 	}
 	word := "issues"
@@ -89,4 +95,14 @@ func runQuickOrder(cmd *cobra.Command, id string, action priority.QuickAction, p
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "Updated %d %s\n", len(changes), word)
 	return nil
+}
+
+// containsIssue reports whether id is among the vault's Issues.
+func containsIssue(issues []priority.Issue, id string) bool {
+	for _, is := range issues {
+		if is.ID == id {
+			return true
+		}
+	}
+	return false
 }

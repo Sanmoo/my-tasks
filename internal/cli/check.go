@@ -121,7 +121,7 @@ func priorityIssuesFromCheckItems(items []check.Item) []priority.Issue {
 }
 
 func applyCheckRankChange(vaultDir string, change priority.Change) error {
-	i, err := readIssue(vaultDir, change.ID)
+	i, err := readIssue(vaultTarget{dir: vaultDir}, change.ID)
 	if err != nil {
 		return err
 	}

@@ -42,7 +42,7 @@ func newDeferCmd() *cobra.Command {
 // runDefer resolves the vault, parses the time argument into the
 // canonical deferred_until value, and writes it onto the Issue.
 func runDefer(cmd *cobra.Command, id, when string) error {
-	vaultDir, err := resolveVault(cmd)
+	t, err := resolveVaultForKey(cmd, id)
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func runDefer(cmd *cobra.Command, id, when string) error {
 		// invocation: a usage error (exit 2), like a bad rank position.
 		return exitcode.Usage(err)
 	}
-	if _, err := mutateIssue(vaultDir, id, func(i issue.Issue) issue.Issue {
+	if _, err := mutateIssue(t, id, func(i issue.Issue) issue.Issue {
 		return i.Defer(until)
 	}); err != nil {
 		return err

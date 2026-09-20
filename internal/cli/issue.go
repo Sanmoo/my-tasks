@@ -224,17 +224,17 @@ func newShowCmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			vaultDir, err := resolveVault(cmd)
+			t, err := resolveVaultForKey(cmd, args[0])
 			if err != nil {
 				return err
 			}
 			if err := checkID(args[0]); err != nil {
 				return err
 			}
-			data, err := os.ReadFile(issuePath(vaultDir, args[0]))
+			data, err := os.ReadFile(issuePath(t.dir, args[0]))
 			if err != nil {
 				if os.IsNotExist(err) {
-					return fmt.Errorf("issue %s not found", args[0])
+					return t.notFoundError(args[0])
 				}
 				return fmt.Errorf("reading issue %s: %w", args[0], err)
 			}
@@ -267,17 +267,17 @@ func newEditCmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			vaultDir, err := resolveVault(cmd)
+			t, err := resolveVaultForKey(cmd, args[0])
 			if err != nil {
 				return err
 			}
 			if err := checkID(args[0]); err != nil {
 				return err
 			}
-			path := issuePath(vaultDir, args[0])
+			path := issuePath(t.dir, args[0])
 			if _, err := os.Stat(path); err != nil {
 				if os.IsNotExist(err) {
-					return fmt.Errorf("issue %s not found", args[0])
+					return t.notFoundError(args[0])
 				}
 				return fmt.Errorf("checking issue %s: %w", args[0], err)
 			}

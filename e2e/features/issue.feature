@@ -260,11 +260,14 @@ Feature: Issue create, show and edit
       """
     When I run `mt show --vault <vault> --one-line pkm-0b4`
     Then the exit code is 0
-    And stdout matches "^◐ pkm-0b4  Comprar material\\n$"
+    And stdout matches "(?m)^◐ pkm-0b4  Comprar material$"
     And stdout does not contain "Created:"
     When I run `mt show --vault <vault> --oneline pkm-0b4`
     Then the exit code is 0
-    And stdout matches "^◐ pkm-0b4  Comprar material\\n$"
+    And stdout matches "(?m)^◐ pkm-0b4  Comprar material$"
+    When I run `mt show --vault <vault> -l pkm-0b4`
+    Then the exit code is 0
+    And stdout matches "(?m)^◐ pkm-0b4  Comprar material$"
 
   Scenario: show summary prints key metadata and the last comment
     Given the file "<vault>/issues/pkm-0b4.md" is written with:
@@ -296,6 +299,9 @@ Feature: Issue create, show and edit
     And stdout contains "Status: in_progress"
     And stdout contains "Last comment: último comentário"
     And stdout does not contain "## Description"
+    When I run `mt show --vault <vault> -s pkm-0b4`
+    Then the exit code is 0
+    And stdout contains "Last comment: último comentário"
 
   Scenario: show rejects both compact output flags
     When I run `mt show --vault <vault> --one-line --summary pkm-0b4`

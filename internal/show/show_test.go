@@ -59,7 +59,7 @@ func TestSummary(t *testing.T) {
 
 	i := minimal()
 	i.Frontmatter.DeferredUntil = "2020-01-01T00:00"
-	i.Body += "### 2026-08-16T14:05\nfirst line\nsecond line\n<!-- comment: 4f2b9c1a -->\n"
+	i.Body += "## Comments\n### 2026-08-16T14:05\nfirst line\nsecond line\n<!-- comment: 4f2b9c1a -->\n"
 	got = show.Summary(i, "pkm-x")
 	want = "Title: Ideia\nKey: pkm-x\nDeferred: yes\nStatus: open\nLast comment: first line second line\n"
 	if got != want {

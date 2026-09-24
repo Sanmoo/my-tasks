@@ -220,8 +220,8 @@ func newShowCmd() *cobra.Command {
 		Short: "Show an Issue (rendered view)",
 		Long: `show renders an Issue in full by default.
 
---one-line (also --oneline) prints the same one-line representation as list.
---summary prints only title, key, deferral, status and the last comment.
+-l/--one-line (also --oneline) prints the same one-line representation as list.
+-s/--summary prints only title, key, deferral, status and the last comment.
 These compact output flags are mutually exclusive.`,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
@@ -270,9 +270,9 @@ These compact output flags are mutually exclusive.`,
 			return err
 		},
 	}
-	cmd.Flags().BoolVar(&oneLine, "one-line", false, "show only the list-style one-line representation")
+	cmd.Flags().BoolVarP(&oneLine, "one-line", "l", false, "show only the list-style one-line representation")
 	cmd.Flags().BoolVar(&oneLine, "oneline", false, "alias for --one-line")
-	cmd.Flags().BoolVar(&summary, "summary", false, "show a compact summary (title, key, deferral, status and last comment)")
+	cmd.Flags().BoolVarP(&summary, "summary", "s", false, "show a compact summary (title, key, deferral, status and last comment)")
 	return cmd
 }
 

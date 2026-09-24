@@ -63,11 +63,14 @@ func LastComment(body string) string {
 			inComments = true
 			continue
 		}
-		if !inComments {
+		if strings.HasPrefix(line, "## ") {
+			if inComments {
+				break
+			}
 			continue
 		}
-		if strings.HasPrefix(line, "## ") {
-			break
+		if !inComments && !strings.HasPrefix(line, "### ") {
+			continue
 		}
 		if strings.HasPrefix(line, "### ") {
 			current = current[:0]

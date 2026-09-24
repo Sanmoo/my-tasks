@@ -216,6 +216,13 @@ func Blocked(blockedBy []string, statusByID map[string]string) bool {
 	return false
 }
 
+// FormatLine renders the standard one-line Issue representation used by
+// list and focused single-Issue views.
+func FormatLine(item Item) string {
+	fm := item.Issue.Frontmatter
+	return fmt.Sprintf("%s %s  %s", Glyph(fm.Status), item.ID, fm.Title)
+}
+
 // Options selects the issues a list view shows.
 //
 // All reveals done issues; without it, done issues are hidden. A future

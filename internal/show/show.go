@@ -29,6 +29,62 @@ type Options struct {
 	Width int
 }
 
+// OneLine returns the compact list-style representation of an Issue.
+func OneLine(i issue.Issue, id string) string {
+	return list.FormatLine(list.Item{ID: id, Issue: i})
+}
+
+// Summary returns the compact metadata view of an Issue. Deferred is
+// true when the Issue carries a deferred_until value, including an
+// expired deferral; mt show does not change persisted data.
+func Summary(i issue.Issue, id string) string {
+	deferred := "no"
+	if i.Frontmatter.DeferredUntil != "" {
+		deferred = "yes"
+	}
+	lastComment := LastComment(i.Body)
+	if lastComment == "" {
+		lastComment = "-"
+	}
+	return fmt.Sprintf("Title: %s\nKey: %s\nDeferred: %s\nStatus: %s\nLast comment: %s\n",
+		i.Frontmatter.Title, id, deferred, i.Frontmatter.Status, lastComment)
+}
+
+// LastComment returns the text of the last anchored comment in the
+// Comments section. Comment text is flattened to one line for summary
+// output. A body without a comment returns an empty string.
+func LastComment(body string) string {
+	lines := strings.Split(body, "\n")
+	inComments := false
+	current := make([]string, 0)
+	last := ""
+	for _, line := range lines {
+		if line == "## Comments" {
+			inComments = true
+			continue
+		}
+		if !inComments {
+			continue
+		}
+		if strings.HasPrefix(line, "## ") {
+			break
+		}
+		if strings.HasPrefix(line, "### ") {
+			current = current[:0]
+			continue
+		}
+		if strings.HasPrefix(line, "<!-- comment: ") && strings.HasSuffix(line, " -->") {
+			last = strings.Join(strings.Fields(strings.Join(current, " ")), " ")
+			current = current[:0]
+			continue
+		}
+		if len(current) > 0 || strings.TrimSpace(line) != "" {
+			current = append(current, line)
+		}
+	}
+	return last
+}
+
 // The ayu palette (the nd show palette), one hex per role per
 // background: light first, dark second.
 var (

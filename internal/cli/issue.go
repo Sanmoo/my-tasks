@@ -211,12 +211,18 @@ func planCreatePlacement(vaultDir string, newIssue priority.Issue, action priori
 
 // newShowCmd builds `mt show <id>`: renders the structured, colored
 // Issue view (header, metadata, Markdown body) in the style of nd show.
-// Colors follow the standard convention (NO_COLOR, CLICOLOR, TTY); a
-// piped stdout renders the same view without ANSI codes.
+// --one-line emits the same compact line as `mt list`; --summary emits
+// title, key, deferral, status and the last comment.
 func newShowCmd() *cobra.Command {
-	return &cobra.Command{
+	var oneLine, summary bool
+	cmd := &cobra.Command{
 		Use:   "show <id>",
 		Short: "Show an Issue (rendered view)",
+		Long: `show renders an Issue in full by default.
+
+--one-line (also --oneline) prints the same one-line representation as list.
+--summary prints only title, key, deferral, status and the last comment.
+These compact output flags are mutually exclusive.`,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
 				return exitcode.Usage(fmt.Errorf("show needs exactly one issue ID"))
@@ -225,6 +231,9 @@ func newShowCmd() *cobra.Command {
 		},
 		ValidArgsFunction: completeIssueID,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if oneLine && summary {
+				return exitcode.Usage(fmt.Errorf("show flags --one-line and --summary are mutually exclusive"))
+			}
 			t, err := resolveVaultForKey(cmd, args[0])
 			if err != nil {
 				return err
@@ -243,6 +252,14 @@ func newShowCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("parsing issue %s: %w", args[0], err)
 			}
+			if oneLine {
+				_, err = fmt.Fprintln(cmd.OutOrStdout(), show.OneLine(i, args[0]))
+				return err
+			}
+			if summary {
+				_, err = fmt.Fprint(cmd.OutOrStdout(), show.Summary(i, args[0]))
+				return err
+			}
 			// TTY detection reads the real stdout, not the injected
 			// writer: the decision is about the terminal the process
 			// is attached to.
@@ -253,6 +270,10 @@ func newShowCmd() *cobra.Command {
 			return err
 		},
 	}
+	cmd.Flags().BoolVar(&oneLine, "one-line", false, "show only the list-style one-line representation")
+	cmd.Flags().BoolVar(&oneLine, "oneline", false, "alias for --one-line")
+	cmd.Flags().BoolVar(&summary, "summary", false, "show a compact summary (title, key, deferral, status and last comment)")
+	return cmd
 }
 
 // newEditCmd builds `mt edit <id>`: opens the Issue file in $EDITOR. The

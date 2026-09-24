@@ -243,6 +243,65 @@ Feature: Issue create, show and edit
     And stdout does not contain "Completed:"
     And stdout does not contain "Deferred until:"
 
+  Scenario: show one-line prints the same compact line as list
+    Given the file "<vault>/issues/pkm-0b4.md" is written with:
+      """
+      ---
+      title: Comprar material
+      status: in_progress
+      labels: []
+      created_at: 2026-06-26T18:00
+      ---
+
+      ## Description
+      corpo
+      ## Notes
+      ## Comments
+      """
+    When I run `mt show --vault <vault> --one-line pkm-0b4`
+    Then the exit code is 0
+    And stdout matches "^◐ pkm-0b4  Comprar material\\n$"
+    And stdout does not contain "Created:"
+    When I run `mt show --vault <vault> --oneline pkm-0b4`
+    Then the exit code is 0
+    And stdout matches "^◐ pkm-0b4  Comprar material\\n$"
+
+  Scenario: show summary prints key metadata and the last comment
+    Given the file "<vault>/issues/pkm-0b4.md" is written with:
+      """
+      ---
+      title: Comprar material
+      status: in_progress
+      labels: []
+      created_at: 2026-06-26T18:00
+      deferred_until: 2999-08-23T00:00
+      ---
+
+      ## Description
+      corpo
+      ## Notes
+      ## Comments
+      ### 2026-08-16T14:05
+      primeiro comentário
+      <!-- comment: 4f2b9c1a -->
+      ### 2026-08-16T15:05
+      último comentário
+      <!-- comment: 9a1b2c3d -->
+      """
+    When I run `mt show --vault <vault> --summary pkm-0b4`
+    Then the exit code is 0
+    And stdout contains "Title: Comprar material"
+    And stdout contains "Key: pkm-0b4"
+    And stdout contains "Deferred: yes"
+    And stdout contains "Status: in_progress"
+    And stdout contains "Last comment: último comentário"
+    And stdout does not contain "## Description"
+
+  Scenario: show rejects both compact output flags
+    When I run `mt show --vault <vault> --one-line --summary pkm-0b4`
+    Then the exit code is 2
+    And stderr contains "mutually exclusive"
+
   Scenario: show renders ANSI codes when color is forced
     When I run `mt create --vault <vault> "comprar material"`
     Then the exit code is 0

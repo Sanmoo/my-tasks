@@ -101,8 +101,7 @@ func loadSortedItems(vaultDir string) ([]list.Item, error) {
 // formatListLine renders the standard one-line Issue representation used by
 // list and its focused query views.
 func formatListLine(it list.Item) string {
-	fm := it.Issue.Frontmatter
-	return fmt.Sprintf("%s %s  %s", list.Glyph(fm.Status), it.ID, fm.Title)
+	return list.FormatLine(it)
 }
 
 // loadItems reads every *.md file in the vault's issues/ directory and

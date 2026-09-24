@@ -42,6 +42,37 @@ func minimal() issue.Issue {
 	}
 }
 
+func TestOneLine(t *testing.T) {
+	got := show.OneLine(full(), "pkm-0b4")
+	want := "◐ pkm-0b4  Comprar material"
+	if got != want {
+		t.Errorf("OneLine() = %q, want %q", got, want)
+	}
+}
+
+func TestSummary(t *testing.T) {
+	got := show.Summary(full(), "pkm-0b4")
+	want := "Title: Comprar material\nKey: pkm-0b4\nDeferred: yes\nStatus: in_progress\nLast comment: -\n"
+	if got != want {
+		t.Errorf("Summary() = %q, want %q", got, want)
+	}
+
+	i := minimal()
+	i.Frontmatter.DeferredUntil = "2020-01-01T00:00"
+	i.Body += "### 2026-08-16T14:05\nfirst line\nsecond line\n<!-- comment: 4f2b9c1a -->\n"
+	got = show.Summary(i, "pkm-x")
+	want = "Title: Ideia\nKey: pkm-x\nDeferred: yes\nStatus: open\nLast comment: first line second line\n"
+	if got != want {
+		t.Errorf("Summary(with comment) = %q, want %q", got, want)
+	}
+}
+
+func TestLastCommentRequiresAnchor(t *testing.T) {
+	if got := show.LastComment("## Comments\n### 2026-08-16T14:05\nnot anchored\n"); got != "" {
+		t.Errorf("LastComment(unanchored) = %q, want empty", got)
+	}
+}
+
 func TestRenderPlainFull(t *testing.T) {
 	got := show.Render(full(), "pkm-0b4", show.Options{Color: false})
 	want := `◐ pkm-0b4 . Comprar material [in_progress]

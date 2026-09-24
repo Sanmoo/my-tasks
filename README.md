@@ -170,8 +170,15 @@ inclusive edições manuais do frontmatter.
 
 ```sh
 mt show pkm-055
-mt edit pkm-055        # exige $EDITOR configurado
+mt show --one-line pkm-055   # ○ pkm-055  comprar material
+mt show --summary pkm-055    # título, key, deferral, status e último comentário
+mt edit pkm-055              # exige $EDITOR configurado
 ```
+
+`show --one-line` (também `--oneline`) usa exatamente o formato compacto de
+`mt list`, sem corpo ou metadados. `show --summary` mostra somente `Title`,
+`Key`, `Deferred` (`yes`/`no`), `Status` e `Last comment` (`-` quando não há
+comentário). As flags são mutuamente exclusivas.
 
 ### Transições de status: `done`, `close`, `reopen`, `status`
 

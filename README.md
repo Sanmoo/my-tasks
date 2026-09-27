@@ -201,9 +201,14 @@ expira). Para arquivar o lembrete, use `mt undefer`. O horário é preservado.
 
 ```sh
 mt defer pkm-055 "26-08-20 08:00"    # absoluto: YY-MM-DD HH:MM (hora importa)
-mt defer pkm-055 +2d                  # relativo: +2d, +1w, +3h
+mt defer pkm-055 +2d                  # relativo: +2d, +1w, +3h, +1m, +1y
 # → pkm-055 deferred until 2026-08-20T08:00
 ```
+
+Os relativos de duração (`d` dias, `w` semanas, `h` horas) somam uma
+duração exata; os de calendário (`m` meses, `y` anos) preservam o dia do
+mês alvo, limitado ao último dia quando o mês é mais curto (31/01 +1m →
+28/02, ou 29/02 +1y → 28/02).
 
 ### `mt undefer [id]`
 

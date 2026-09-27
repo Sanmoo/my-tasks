@@ -60,6 +60,15 @@ func TestParseRelative(t *testing.T) {
 		{"nine days", "+9d", "2026-08-24T14:30"},
 		{"nineteen hours", "+19h", "2026-08-16T09:30"},
 		{"largest safe day count", "+106751d", "2318-11-24T14:30"},
+		{"years", "+6y", "2032-08-15T14:30"},
+		{"one year", "+1y", "2027-08-15T14:30"},
+		{"months", "+6m", "2027-02-15T14:30"},
+		{"one month", "+1m", "2026-09-15T14:30"},
+		{"month crossing a year boundary", "+5m", "2027-01-15T14:30"},
+		{"twelve months is one year", "+12m", "2027-08-15T14:30"},
+		{"eighteen months", "+18m", "2028-02-15T14:30"},
+		{"largest year in range", "+7973y", "9999-08-15T14:30"},
+		{"largest month in range", "+95680m", "9999-12-15T14:30"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -69,6 +78,33 @@ func TestParseRelative(t *testing.T) {
 			}
 			if got != c.want {
 				t.Errorf("Parse(%q) = %q, want %q", c.in, got, c.want)
+			}
+		})
+	}
+}
+
+func TestParseRelativeCalendarClampsToEndOfMonth(t *testing.T) {
+	// Calendar units land on the same day of the target month, clamped
+	// to that month's last day when it is shorter than the source day
+	// (Jan 31 + 1 month is Feb 28/29, not Mar 2/3).
+	cases := []struct {
+		name string
+		now  time.Time
+		in   string
+		want string
+	}{
+		{"day past the target month end", time.Date(2026, 1, 31, 10, 0, 0, 0, time.UTC), "+1m", "2026-02-28T10:00"},
+		{"day past a leap February", time.Date(2024, 1, 31, 10, 0, 0, 0, time.UTC), "+1m", "2024-02-29T10:00"},
+		{"leap day plus a year", time.Date(2024, 2, 29, 10, 0, 0, 0, time.UTC), "+1y", "2025-02-28T10:00"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := deferral.Parse(c.in, c.now)
+			if err != nil {
+				t.Fatalf("Parse(%q) error: %v", c.in, err)
+			}
+			if got != c.want {
+				t.Errorf("Parse(%q, %v) = %q, want %q", c.in, c.now, got, c.want)
 			}
 		})
 	}
@@ -115,6 +151,10 @@ func TestParseRejectsMalformed(t *testing.T) {
 		{"double plus", "++2d"},
 		{"overflowing number", "+99999999999999999999d"},
 		{"duration multiplication overflow", "+106752d"},
+		{"year beyond the representable range", "+7974y"},
+		{"month beyond the representable range", "+95681m"},
+		{"overflowing year number", "+99999999999999999999y"},
+		{"overflowing month number", "+99999999999999999999m"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -129,7 +169,9 @@ func TestParseErrorMessagesHintAtTheFormat(t *testing.T) {
 	if _, err := deferral.Parse("bogus", now); err == nil || !strings.Contains(err.Error(), "YY-MM-DD HH:MM") {
 		t.Errorf("absolute error = %v, want it to hint at YY-MM-DD HH:MM", err)
 	}
-	if _, err := deferral.Parse("+2x", now); err == nil || !strings.Contains(err.Error(), "d (days), w (weeks) or h (hours)") {
-		t.Errorf("relative error = %v, want it to hint at d/w/h", err)
+	if _, err := deferral.Parse("+2x", now); err == nil ||
+		!strings.Contains(err.Error(), "d (days)") || !strings.Contains(err.Error(), "m (months)") ||
+		!strings.Contains(err.Error(), "y (years)") {
+		t.Errorf("relative error = %v, want it to hint at the units", err)
 	}
 }

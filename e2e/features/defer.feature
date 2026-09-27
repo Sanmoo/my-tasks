@@ -2,7 +2,7 @@ Feature: Defer issues
 
   mt defer <id> <when> sets deferred_until keeping the Issue open: it
   accepts an absolute YY-MM-DD HH:MM (the hour is kept, not truncated)
-  and relative durations (+2d, +1w, +3h) computed from now. A deferred
+  and relative durations (+2d, +1w, +3h, +1m, +1y) computed from now. A deferred
   Issue stays visible in list, marked with a [defer ...] suffix, and
   becomes available on its own when now >= deferred_until; when the
   deferral is expired, mt undefer archives the
@@ -34,6 +34,19 @@ Feature: Defer issues
     And stdout contains "<id> deferred until "
     And the file "<vault>/issues/<id>.md" matches "deferred_until: [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}"
     And the file "<vault>/issues/<id>.md" contains "status: open"
+
+  Scenario: defer with a relative month or year computes a calendar target
+    When I run `mt create --vault <vault> "adiar por anos"`
+    Then the exit code is 0
+    And I remember the issue ID
+    When I run `mt defer --vault <vault> <id> +6y`
+    Then the exit code is 0
+    And stdout contains "<id> deferred until "
+    And the file "<vault>/issues/<id>.md" matches "deferred_until: [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}"
+    When I run `mt defer --vault <vault> <id> +6m`
+    Then the exit code is 0
+    And stdout contains "<id> deferred until "
+    And the file "<vault>/issues/<id>.md" matches "deferred_until: [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}"
 
   Scenario: deferring an in-progress Issue returns it to open
     When I run `mt create --vault <vault> "adiar trabalho em andamento"`

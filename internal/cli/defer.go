@@ -27,7 +27,7 @@ func newDeferCmd() *cobra.Command {
 		Long:  deferLong,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) < 2 {
-				return exitcode.Usage(fmt.Errorf("defer needs an issue ID and a time (YY-MM-DD HH:MM or +2d/+1w/+3h)"))
+				return exitcode.Usage(fmt.Errorf("defer needs an issue ID and a time (YY-MM-DD HH:MM or +2d/+1w/+3h/+1m/+1y)"))
 			}
 			return nil
 		},
@@ -69,4 +69,6 @@ deferral is expired, mt undefer archives the reminder.
 
 The time is either an absolute local datetime in YY-MM-DD HH:MM form
 (e.g. 26-08-20 08:00 — the hour is kept) or a relative duration from
-now (+2d, +1w, +3h).`
+now (+2d, +1w, +3h, +1m, +1y). Duration units d/w/h add an exact
+duration; calendar units m (months) and y (years) keep the day of the
+target month, clamped to its last day (Jan 31 +1m is Feb 28).`

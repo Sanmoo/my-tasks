@@ -23,6 +23,15 @@ const absoluteLayout = "06-01-02 15:04"
 // before multiplying by their unit duration.
 const maxDuration = time.Duration(1<<63 - 1)
 
+// maxYear is the largest year NaiveLayout can round-trip: its "2006"
+// token parses exactly four digits, so a calendar target must stay within
+// 0000-9999.
+const maxYear = 9999
+
+// unitList is the catalogue of relative units, shared by the parse error
+// messages so the accepted set is documented in one place.
+const unitList = "d (days), w (weeks), h (hours), m (months) or y (years)"
+
 // Parse converts a `mt defer` time argument to the canonical
 // deferred_until value (issue.NaiveLayout, YYYY-MM-DDTHH:MM naive local
 // time). It accepts:
@@ -30,7 +39,10 @@ const maxDuration = time.Duration(1<<63 - 1)
 //   - an absolute "YY-MM-DD HH:MM"; the two-digit year is expanded to
 //     20YY, so any year this century is reachable and the hour is kept;
 //   - a relative "+<n><unit>" computed from now, where unit is d (days),
-//     w (weeks) or h (hours) and n is a positive integer.
+//     w (weeks), h (hours), m (months) or y (years) and n is a positive
+//     integer. Duration units (d/w/h) add an exact duration; calendar
+//     units (m/y) add calendar months/years, clamping the day to the
+//     target month's last day (Jan 31 + 1m is Feb 28/29).
 //
 // now is used only for relative forms. Anything else returns an error.
 func Parse(s string, now time.Time) (string, error) {
@@ -48,7 +60,7 @@ func Parse(s string, now time.Time) (string, error) {
 func parseAbsolute(s string) (string, error) {
 	t, err := time.ParseInLocation(absoluteLayout, s, time.Local)
 	if err != nil {
-		return "", fmt.Errorf("invalid defer time %q: want YY-MM-DD HH:MM (e.g. 26-08-20 08:00) or a relative duration (+2d, +1w, +3h)", s)
+		return "", fmt.Errorf("invalid defer time %q: want YY-MM-DD HH:MM (e.g. 26-08-20 08:00) or a relative duration (+2d, +1w, +3h, +1m, +1y)", s)
 	}
 	if t.Year() < 2000 {
 		t = t.AddDate(100, 0, 0)
@@ -56,8 +68,10 @@ func parseAbsolute(s string) (string, error) {
 	return t.Format(issue.NaiveLayout), nil
 }
 
-// parseRelative parses "+<n><unit>" (n positive, unit d/w/h) and returns
-// now plus that duration, formatted to the canonical stored form.
+// parseRelative parses "+<n><unit>" (n positive, unit d/w/h/m/y) and
+// returns now plus that amount, formatted to the canonical stored form.
+// Duration units (d/w/h) add exact durations; calendar units (m/y) add
+// whole months/years with end-of-month clamping.
 func parseRelative(s string, now time.Time) (string, error) {
 	body := s[1:] // drop the "+" (Parse guarantees the prefix)
 	if len(body) < 2 {
@@ -76,9 +90,15 @@ func parseRelative(s string, now time.Time) (string, error) {
 	if err != nil || n <= 0 {
 		return "", invalidDuration(s)
 	}
+	if unit == 'y' {
+		return calendarUntil(s, now, n, 0)
+	}
+	if unit == 'm' {
+		return calendarUntil(s, now, n/12, n%12)
+	}
 	per, ok := unitDuration(unit)
 	if !ok {
-		return "", fmt.Errorf("invalid defer duration %q: unit must be d (days), w (weeks) or h (hours)", s)
+		return "", fmt.Errorf("invalid defer duration %q: unit must be %s", s, unitList)
 	}
 	count := time.Duration(n)
 	if count > maxDuration/per {
@@ -87,10 +107,57 @@ func parseRelative(s string, now time.Time) (string, error) {
 	return now.Add(count * per).Format(issue.NaiveLayout), nil
 }
 
+// calendarUntil returns the canonical stored form of now shifted by the
+// given calendar years and months, or invalidDuration(s) when the target
+// falls outside the four-digit year range NaiveLayout can represent.
+func calendarUntil(s string, now time.Time, years, months int) (string, error) {
+	t, ok := addCalendar(now, years, months)
+	if !ok {
+		return "", invalidDuration(s)
+	}
+	return t.Format(issue.NaiveLayout), nil
+}
+
+// addCalendar returns now shifted by years and months with calendar
+// semantics: the day-of-month is kept when it exists in the target
+// month, and clamped to that month's last day otherwise (Jan 31 + 1
+// month is Feb 28/29; Feb 29 + 1 year is Feb 28). The clock time is
+// preserved. Go's time.AddDate normalizes an overflowing day into the
+// next month (Jan 31 + 1 month is Mar 2/3), which is the wrong target
+// for a deferral, so the day is clamped explicitly. ok is false when the
+// target year exceeds maxYear.
+//
+// months is expected to be under 12 (the caller splits a month count into
+// years and a remainder), so the month arithmetic cannot overflow.
+func addCalendar(now time.Time, years, months int) (time.Time, bool) {
+	// Check the year before adding so a count near the Atoi limit cannot
+	// overflow the int year arithmetic.
+	if years > maxYear-now.Year() {
+		return time.Time{}, false
+	}
+	total := int(now.Month()) - 1 + months
+	year := now.Year() + years + total/12
+	if year > maxYear {
+		return time.Time{}, false
+	}
+	month := time.Month(total%12 + 1)
+	day := now.Day()
+	if last := lastDayOfMonth(year, month); day > last {
+		day = last
+	}
+	return time.Date(year, month, day, now.Hour(), now.Minute(), 0, 0, now.Location()), true
+}
+
+// lastDayOfMonth returns the last day of year/month: day 0 of the next
+// month normalizes to it (month 13 rolls into January of year+1).
+func lastDayOfMonth(year int, month time.Month) int {
+	return time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
+}
+
 // invalidDuration renders the shared error for a malformed relative
 // duration.
 func invalidDuration(s string) error {
-	return fmt.Errorf("invalid defer duration %q: want +<n><unit> with a positive count and unit d (days), w (weeks) or h (hours) (e.g. +2d)", s)
+	return fmt.Errorf("invalid defer duration %q: want +<n><unit> with a positive count and unit %s (e.g. +2d)", s, unitList)
 }
 
 // unitDuration returns the duration of one unit of the relative form,

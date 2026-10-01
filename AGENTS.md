@@ -8,7 +8,7 @@ Todo trabalho roda num worktree isolado. A `main` só avança por merge fast-for
 
 **Julgue antes de começar:** a alteração é simples ou não?
 
-- **Simples** — documentação (inclusive este `AGENTS.md`), ajuste de texto, correção pontual, sem mudança de comportamento. Integre direto na `main` pela sequência **Finish simples**; sem PR. Alteração sem mudança de comportamento não tem evidência funcional a mostrar — por isso não abre PR.
+- **Simples** — documentação (inclusive este `AGENTS.md`), ajuste de texto, correção pontual, sem mudança de comportamento. Integre direto na `main` pela sequência **Finish simples** — merge fast-forward **e push para o remoto**, sem pedir autorização extra; sem PR. Alteração sem mudança de comportamento não tem evidência funcional a mostrar — por isso não abre PR.
 - **Não simples** — qualquer mudança de comportamento, código, testes ou contrato público, ou que atravesse vários módulos. Abra PR pela sequência **Finish com PR**, com a **evidência de teste funcional** no corpo. A entrega só está concluída depois que o usuário sinalizar que a PR foi mergeada e o worktree e a branch forem removidos.
 
 Na dúvida, trate como não simples.
@@ -19,14 +19,17 @@ Start — no checkout principal, com `main` atual:
 
 `<slug>` é o nome do arquivo do ticket (ex.: `03-issue-create-show-edit`). Commits e `make check` acontecem dentro de `.worktrees/<slug>`.
 
-### Finish simples — integra direto na `main`
+### Finish simples — integra direto na `main` e publica
 
     git rebase main                     # no worktree — resolve conflitos lá
     git merge --ff-only <slug>          # no checkout principal
+    git push origin main                # publica a integração — sem pedir autorização
     git worktree remove .worktrees/<slug>
     git branch -d <slug>
 
 O rebase garante o fast-forward; se o `--ff-only` falhar, volte ao rebase — nunca force.
+
+O push faz parte do finish simples: `main` local e `origin/main` avançam juntos, e a alteração só está entregue quando o remoto recebe o fast-forward. Se o push for rejeitado (divergência, branch protegida, rede), pare e reporte — nunca use `--force`.
 
 ### Finish com PR — só limpa depois do aval do usuário
 

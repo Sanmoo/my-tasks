@@ -113,6 +113,18 @@ run rank "$ID1" 0
 run rank "$ID1" x
 run unrank "$ID1"
 run top
+# Encaixe: mt place precisa de respostas válidas; sem terminal no stdout e
+# sem --answers o gate vira erro (não pendura o audit), e --answers inválido
+# ou cancelado sai com o código da convenção.
+run place
+run place "$ID1" --answers a
+run rank "$ID2" 2
+run place "$ID2" --answers x
+run place "$ID2" --answers q
+run place "$ID2" --answers a
+run place nope --answers a
+run create "sem place" --answers a --no-place
+run create "posicao dupla" --no-place --top
 
 label "list family"
 run list

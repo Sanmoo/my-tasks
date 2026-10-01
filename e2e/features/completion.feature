@@ -206,6 +206,9 @@ Feature: Shell completion of issue IDs
     When I run `mt __completeNoDesc rank dom-ab`
     Then the exit code is 0
     And stdout contains "dom-abcd"
+    When I run `mt __completeNoDesc place dom-ab`
+    Then the exit code is 0
+    And stdout contains "dom-abcd"
     When I run `mt __completeNoDesc comment dom-ab`
     Then the exit code is 0
     And stdout contains "dom-abcd"

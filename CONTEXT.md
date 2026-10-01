@@ -28,6 +28,22 @@ _Avoid_: prioridade, ordem (ordem é a sequência resultante; rank é o valor qu
 O conjunto de issues sem rank, abaixo da fila priorizada. É onde as ideias vivem até serem priorizadas.
 _Avoid_: normal, não-priorizadas
 
+**Encaixe**:
+A operação de descobrir o Rank de uma Issue comparando-a com as Issues já na fila, uma de cada vez. É o que `mt place` faz e o que `mt create`/`mt q` fazem por padrão.
+_Avoid_: priorizar, ordenar, inserir
+
+**Comparação**:
+Uma pergunta estrita de uma sessão de Encaixe: entre duas Issues, qual vem antes. Sem empate — Rank é único por vault. A resposta "indiferente" não é um empate: é a ordem já gravada que decide (a Issue encaixada entra logo após a Candidata).
+_Avoid_: pergunta, duelo, voto
+
+**Candidata**:
+A Issue da fila que ocupa o meio do intervalo corrente de um Encaixe e é o segundo item da Comparação. Issue no Backlog e Issue não-priorizável (`done`, status custom) nunca são Candidatas.
+_Avoid_: oponente, referência, pivô
+
+**Ponto de encaixe**:
+O Rank que uma sessão de Encaixe conclui para a Issue encaixada.
+_Avoid_: posição (posição é o argumento explícito de `mt rank <id> <n>`)
+
 **Deferred until**:
 Data e hora a partir da qual uma issue fica disponível. Antes disso, a issue permanece `open` e continua **visível**, mas é **indisponível** para `pick-next` e `ready`. Quando `now >= deferred_until`, a Deferral está expirada e a issue volta a ficar disponível por conta própria.
 _Avoid_: snooze, adiamento, defer-como-status

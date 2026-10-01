@@ -91,6 +91,51 @@ func Run(t *testing.T, args, env []string) Result {
 	return res
 }
 
+// RunCmdPTY runs bin with a pseudo-terminal as the child's stdout, which is
+// the only way to reach the flows that ask questions only for a human at a
+// terminal (mt place). input is what the scenario types, so it plays the part
+// stdin plays in a real session. A terminal merges the child's stdout and
+// stderr — that is what a terminal is — so Result.Stdout carries the merged
+// text and Result.Stderr stays empty; the child's exit code is preserved.
+//
+// The pty comes from util-linux's script(1); a missing or too-old script is
+// reported as a harness error naming it, not as a silent scenario gap.
+func RunCmdPTY(bin, dir string, args, env []string, input string) (Result, error) {
+	cmd := exec.Command("script", "--echo", "never", "-qec", quoteCommand(bin, args), "/dev/null")
+	cmd.Dir = dir
+	cmd.Env = mergeEnv(env)
+	cmd.Stdin = strings.NewReader(input)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	res := Result{Stdout: stdout.String()}
+	if err != nil {
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			return res, fmt.Errorf("running %s in a pseudo-terminal: %w (the terminal scenarios need util-linux script(1))", bin, err)
+		}
+		res.ExitCode = exitErr.ExitCode()
+	}
+	// script(1) itself failing (no --echo support, for instance) leaves no
+	// session output behind; report its complaint instead of letting the
+	// scenario fail on a puzzling assertion.
+	if res.ExitCode != 0 && stdout.Len() == 0 && stderr.Len() > 0 {
+		return res, fmt.Errorf("script(1) failed: %s", strings.TrimSpace(stderr.String()))
+	}
+	return res, nil
+}
+
+// quoteCommand builds the shell string script(1) -c runs: the harness's own
+// argument list, single-quoted so the shell hands each argument over intact.
+func quoteCommand(bin string, args []string) string {
+	parts := make([]string, 0, len(args)+1)
+	for _, arg := range append([]string{bin}, args...) {
+		parts = append(parts, "'"+strings.ReplaceAll(arg, "'", `'\''`)+"'")
+	}
+	return strings.Join(parts, " ")
+}
+
 // mergeEnv returns the inherited environment with the extra variables
 // applied last, dropping inherited duplicates so overrides always win.
 func mergeEnv(extra []string) []string {

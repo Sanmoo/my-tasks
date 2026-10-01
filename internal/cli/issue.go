@@ -27,7 +27,8 @@ import (
 // with spaces, so it needs no shell quoting.
 func newCreateCmd() *cobra.Command {
 	var labels []string
-	var top, bottom bool
+	var top, bottom, noPlace bool
+	var answers string
 	cmd := &cobra.Command{
 		Use:   "create <title>",
 		Short: "Create a new Issue",
@@ -36,12 +37,16 @@ title, status (open), labels and created_at in the frontmatter, and the
 empty Description/Notes/Comments body. The ID is the vault prefix plus a
 short random suffix; created_at is stamped automatically.
 
-With --top or --bottom the Issue is created already in the priority
-queue — at position 1, or at the end — instead of the Backlog, with the
-same order semantics as ` + "`mt top`/`mt bottom`" + `; the output then reports
-its rank.`,
+Without --top/--bottom the Issue is placed in the queue by pairwise
+comparison as soon as it is written — the same session as mt place —
+unless --no-place skips it. With --top or --bottom it enters the queue
+already at position 1 or at the end, with the same order semantics as
+` + "`mt top`/`mt bottom`" + `; the output then reports its rank.
+
+Without a terminal on stdout (a pipe, a script) the session is skipped and
+the Issue stays in the Backlog, so capturing never blocks on a question.`,
 		Args: func(cmd *cobra.Command, args []string) error {
-			if err := checkPlacementFlags(top, bottom); err != nil {
+			if err := checkCreateFlags(top, bottom, noPlace, answers); err != nil {
 				return err
 			}
 			if len(args) < 1 {
@@ -50,25 +55,29 @@ its rank.`,
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runCreate(cmd, strings.Join(args, " "), labels, false, placementAction(top, bottom))
+			return runCreate(cmd, strings.Join(args, " "), labels, false, placementAction(top, bottom), placeRequest{answers: answers, disabled: noPlace})
 		},
 	}
 	cmd.Flags().StringArrayVar(&labels, "label", nil, "label; repeatable (free-form)")
 	addPlacementFlags(cmd, &top, &bottom)
+	addPlaceFlags(cmd, &noPlace, &answers)
 	return cmd
 }
 
 // newQCmd builds `mt q <título>`: like create, but prints only the ID —
 // for capturing ideas without leaving the flow. It accepts the same
-// --top/--bottom placement flags, still printing just the ID.
+// --top/--bottom placement flags and the same default session, still
+// printing just the ID: the ID goes to stdout before the first Comparação
+// (which asks on stderr), so a cancelled session still leaves the ID in hand.
 func newQCmd() *cobra.Command {
-	var top, bottom bool
+	var top, bottom, noPlace bool
+	var answers string
 	cmd := &cobra.Command{
 		Use:   "q <title>",
 		Short: "Create an Issue and print only its ID",
-		Long:  "q is the quiet create: it writes the same Issue file as create, but prints only the new ID. Like create, it accepts --top/--bottom to place the Issue in the queue; the output stays just the ID.",
+		Long:  "q is the quiet create: it writes the same Issue file as create, but prints only the new ID. Like create, it accepts --top/--bottom to place the Issue in the queue, --no-place to keep it in the Backlog, and --answers; without a terminal on stdout the placement session is skipped and the output stays just the ID.",
 		Args: func(cmd *cobra.Command, args []string) error {
-			if err := checkPlacementFlags(top, bottom); err != nil {
+			if err := checkCreateFlags(top, bottom, noPlace, answers); err != nil {
 				return err
 			}
 			if len(args) < 1 {
@@ -77,10 +86,11 @@ func newQCmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runCreate(cmd, strings.Join(args, " "), nil, true, placementAction(top, bottom))
+			return runCreate(cmd, strings.Join(args, " "), nil, true, placementAction(top, bottom), placeRequest{answers: answers, disabled: noPlace})
 		},
 	}
 	addPlacementFlags(cmd, &top, &bottom)
+	addPlaceFlags(cmd, &noPlace, &answers)
 	return cmd
 }
 
@@ -92,12 +102,36 @@ func addPlacementFlags(cmd *cobra.Command, top, bottom *bool) {
 	cmd.Flags().BoolVarP(bottom, "bottom", "b", false, "create the Issue at the end of the queue")
 }
 
+// addPlaceFlags registers the Encaixe session flags shared by create and q:
+// without --no-place the new Issue is placed by pairwise comparison as soon as
+// it is written, and --answers replies to that session non-interactively.
+func addPlaceFlags(cmd *cobra.Command, noPlace *bool, answers *string) {
+	cmd.Flags().BoolVar(noPlace, "no-place", false, "create the Issue without the placement session (it stays in the Backlog)")
+	cmd.Flags().StringVar(answers, "answers", "", answersUsage)
+}
+
 // checkPlacementFlags rejects --top and --bottom together: the two
 // placements contradict each other, so the invocation is malformed
 // (a usage error under the exit-code convention).
 func checkPlacementFlags(top, bottom bool) error {
 	if top && bottom {
 		return exitcode.Usage(fmt.Errorf("--top and --bottom are mutually exclusive"))
+	}
+	return nil
+}
+
+// checkCreateFlags rejects contradictory create/q placement flags: --top and
+// --bottom contradict each other, --no-place contradicts an explicit position,
+// and --answers can only feed the session the other three suppress.
+func checkCreateFlags(top, bottom, noPlace bool, answers string) error {
+	if err := checkPlacementFlags(top, bottom); err != nil {
+		return err
+	}
+	if noPlace && (top || bottom) {
+		return exitcode.Usage(fmt.Errorf("--no-place and --top/--bottom are mutually exclusive"))
+	}
+	if answers != "" && (noPlace || top || bottom) {
+		return exitcode.Usage(fmt.Errorf("--answers replies to the placement session, which --no-place/--top/--bottom suppress"))
 	}
 	return nil
 }
@@ -122,8 +156,11 @@ func placementAction(top, bottom bool) *priority.QuickAction {
 // (just the ID when quiet, a confirmation line otherwise). With a
 // placement action the Issue is created already in the queue: the
 // quick-order plan — the same one behind `mt top`/`mt bottom` — computes
-// its rank and the shifts of the Issues it displaces.
-func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, placement *priority.QuickAction) error {
+// its rank and the shifts of the Issues it displaces. Otherwise place
+// carries the implicit Encaixe session: the Issue is written first (the
+// capture must not depend on the questions) and the rank it converges to is
+// applied afterwards.
+func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, placement *priority.QuickAction, place placeRequest) error {
 	vaultDir, err := resolveVault(cmd)
 	if err != nil {
 		return err
@@ -175,6 +212,12 @@ func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, pl
 		fmt.Fprintf(cmd.OutOrStdout(), "Created %s (rank %d)\n", id, *i.Frontmatter.Rank)
 	default:
 		fmt.Fprintf(cmd.OutOrStdout(), "Created %s\n", id)
+	}
+	// The confirmation is printed before the session: stdout then carries the
+	// same line whether or not a session runs, and it survives a Ctrl-C during
+	// the questions. The session's own output goes to stderr.
+	if placement == nil && !place.disabled {
+		return placeNewIssue(cmd, vaultDir, id, place.answers)
 	}
 	return nil
 }

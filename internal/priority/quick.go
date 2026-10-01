@@ -25,25 +25,12 @@ const (
 // ignored by the other actions. Non-prioritizable issues are not part of the
 // queue, just as they are not part of the prioritize buffer.
 func QuickPlan(issues []Issue, id string, action QuickAction, position int) ([]Change, error) {
-	ordered := prioritizableIssues(issues)
-	var target Issue
-	found := false
-	for _, is := range ordered {
-		if is.ID == id {
-			target = is
-			found = true
-			break
-		}
-	}
-	if !found {
-		for _, is := range issues {
-			if is.ID == id {
-				return nil, fmt.Errorf("issue %s is %s and cannot be prioritized", id, is.Status)
-			}
-		}
-		return nil, fmt.Errorf("unknown issue ID %q", id)
+	target, err := findPrioritizable(issues, id)
+	if err != nil {
+		return nil, err
 	}
 
+	ordered := prioritizableIssues(issues)
 	queue := make([]Issue, 0, len(ordered))
 	backlog := make([]Issue, 0, len(ordered))
 	for _, is := range ordered {

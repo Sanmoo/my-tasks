@@ -100,6 +100,7 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	})
 
 	sc.Step(`^I run \x60mt(?: (.*))?\x60$`, iRunMt)
+	sc.Step(`^I run \x60mt(?: (.*))?\x60 at a terminal, typing:$`, iRunMtAtTerminal)
 	sc.Step(`^the working directory is "([^"]*)"$`, workingDirectoryIs)
 	sc.Step(`^the exit code is (\d+)$`, exitCodeIs)
 	sc.Step(`^stdout contains "([^"]*)"$`, stdoutContains)
@@ -139,6 +140,37 @@ func iRunMt(ctx context.Context, args string) (context.Context, error) {
 	}
 	args = st.expand(args)
 	res, err := support.RunCmdIn(support.Binary(), st.dir, splitArgs(args), st.env())
+	if err != nil {
+		return ctx, err
+	}
+	st.result = res
+	st.ran = true
+	return ctx, nil
+}
+
+// iRunMtAtTerminal runs mt with a pseudo-terminal as stdout, typing the
+// docstring as the session's answers. It is the only way to exercise the flows
+// that ask questions only when a human is at a terminal (mt place); a terminal
+// merges stdout and stderr, so the merged text lands in stdout and stderr stays
+// empty — assert on stdout and on the files on disk in these scenarios.
+func iRunMtAtTerminal(ctx context.Context, args string, doc *godog.DocString) (context.Context, error) {
+	st, err := stateFrom(ctx)
+	if err != nil {
+		return ctx, err
+	}
+	if doc == nil {
+		return ctx, errors.New("running at a terminal needs a docstring with what the user types")
+	}
+	args = st.expand(args)
+	// Each docstring line is a line the user typed and confirmed with Enter,
+	// so the input always ends with a newline: a pseudo-terminal in canonical
+	// mode never hands over a partial line, and the harness would deadlock
+	// waiting for a session answer that the pty is still holding.
+	typed := st.expand(doc.Content)
+	if !strings.HasSuffix(typed, "\n") {
+		typed += "\n"
+	}
+	res, err := support.RunCmdPTY(support.Binary(), st.dir, splitArgs(args), st.env(), typed)
 	if err != nil {
 		return ctx, err
 	}

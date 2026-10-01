@@ -106,8 +106,8 @@ func runDepAdd(cmd *cobra.Command, id, blocker string) error {
 	if blocker == id {
 		return fmt.Errorf("issue %s cannot block itself", id)
 	}
-	if _, err := mutateIssue(t, id, func(i issue.Issue) issue.Issue {
-		return i.AddBlocker(blocker)
+	if _, err := mutateIssue(t, id, func(i issue.Issue) (issue.Issue, error) {
+		return i.AddBlocker(blocker), nil
 	}); err != nil {
 		return err
 	}
@@ -145,8 +145,8 @@ func runDepRm(cmd *cobra.Command, id, blocker string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := mutateIssue(t, id, func(i issue.Issue) issue.Issue {
-		return i.RemoveBlocker(blocker)
+	if _, err := mutateIssue(t, id, func(i issue.Issue) (issue.Issue, error) {
+		return i.RemoveBlocker(blocker), nil
 	}); err != nil {
 		return err
 	}

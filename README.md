@@ -84,13 +84,13 @@ Resumo:
 | `mt q <título>` | cria uma Issue e imprime só o ID (mesmas flags do create) |
 | `mt show <id>` | mostra a Issue renderizada (header, metadados, corpo) |
 | `mt edit <id>` | abre a Issue no `$EDITOR` |
-| `mt done <id>` (alias `close`) | fecha a Issue (carimba `completed_at`) |
-| `mt reopen <id>` | reabre (limpa `completed_at` e `started_at`) |
-| `mt status <id> <status>` | transição livre de status |
+| `mt done <id> [comentário]` (alias `close`) | fecha a Issue (carimba `completed_at`), anexando o comentário final |
+| `mt reopen <id> [comentário]` | reabre (limpa `completed_at` e `started_at`), anexando o comentário final |
+| `mt status <id> <status> [comentário]` | transição livre de status, anexando o comentário final |
 | `mt defer <id> <quando>` | adia a Issue até uma data/hora |
 | `mt undefer [id]` | limpa `deferred_until` (todas as expiradas, ou uma Issue) |
 | `mt dep add <id> <bloqueador>` / `mt dep rm <id> <bloqueador>` | registra/remove dependência (`blocked_by`) |
-| `mt comment <id> <texto>` | anexa um comentário com timestamp |
+| `mt comment <id> <texto>` | anexa um comentário com timestamp (texto em branco é erro) |
 | `mt list` | lista na ordem de prioridade |
 | `mt ready` | lista as Issues disponíveis agora |
 | `mt overdue` | atenção temporal: Deferrais expiradas, depois Deadlines estourados |
@@ -204,6 +204,7 @@ comentário). As flags são mutuamente exclusivas.
 
 ```sh
 mt done pkm-055        # status done + completed_at carimbado; close é alias
+mt done pkm-055 "comprei o resto da lista"   # fecha e anexa o comentário
 mt reopen pkm-055      # open, limpando completed_at e started_at
 mt status pkm-055 in_progress   # transição livre, validada contra os status do vault
 ```
@@ -212,6 +213,22 @@ Não há máquina de estados: qualquer status da lista do vault é alcançável
 com `status`. Só `done` (terminal, carimba `completed_at`) e `pick-next`
 (→ `in_progress`) têm comportamento especial. Status fora da lista do vault
 é rejeitado na hora (exit 1) e reportado por `check`.
+
+As três transições (`done`/`close`, `reopen`, `status`) aceitam um
+comentário final opcional: os argumentos depois do ID (e do status, no
+`status`) são juntados com espaço, como em `mt comment`.
+
+```sh
+mt status pkm-055 in_progress "esperando o fornecedor"
+mt reopen pkm-055 'faltou o comprovante'
+```
+
+O comentário é escrito do mesmo jeito que `mt comment` escreve um — heading
+com timestamp, texto, âncora estável — e na **mesma gravação** da transição:
+o heading leva o mesmo timestamp de `completed_at`, e o comentário aparece
+como `Last comment` no `mt show --summary`. Texto presente mas em branco é
+erro de uso (exit 2) — um comentário vazio ficaria para sempre no corpo
+append-only. Sem comentário, a invocação é exatamente a de antes.
 
 ### `mt defer <id> <quando>`
 
@@ -275,7 +292,9 @@ mt dep rm pkm-002 pkm-001
 
 Anexa um comentário à seção `## Comments` da Issue: heading com timestamp,
 o texto e uma âncora estável (`<!-- comment: … -->`) por comentário.
-Append-only: o corpo existente é preservado byte a byte.
+Append-only: o corpo existente é preservado byte a byte. Texto em branco é
+erro de uso (exit 2) — o comentário vazio ficaria para sempre no arquivo.
+As transições de status aceitam o mesmo comentário como argumento final.
 
 ```sh
 mt comment pkm-055 "comprei metade da lista"
@@ -596,7 +615,8 @@ Regras de campo:
 - Datas são `YYYY-MM-DDTHH:MM` naive (sem timezone, sem segundos) — diffs
   mínimos e leitura humana;
 - Corpo com apenas `## Description`, `## Notes`, `## Comments`;
-- Comentário = heading de timestamp + âncora estável `<!-- comment: <curto> -->`.
+- Comentário = heading de timestamp + âncora estável `<!-- comment: <curto> -->`
+  (o mesmo formato para `mt comment` e para o comentário de uma transição);
 
 ## Exit codes e streams
 
@@ -606,7 +626,7 @@ Convenção de saída do processo — a mesma para todos os comandos:
 | --- | --- | --- |
 | `0` | sucesso | qualquer comando que cumpriu o que pediu |
 | `1` | erro de usuário — comando bem-formado que falhou contra o estado atual | vault indefinido/bookmark desconhecido, Issue não encontrada, status fora da lista do vault, nada disponível em `pick-next`, rank duplicado, edição inválida no `prioritize`, `init` num vault existente |
-| `2` | erro de uso — invocação malformada | comando/flag/tópico de help desconhecido, contagem de argumentos errada, argumento malformado (nome de bookmark inválido, posição de rank não inteiro positivo, ID de Issue com separador de caminho, tempo de `defer` não-parseável, dois `@bookmark`) |
+| `2` | erro de uso — invocação malformada | comando/flag/tópico de help desconhecido, contagem de argumentos errada, argumento malformado (nome de bookmark inválido, posição de rank não inteiro positivo, ID de Issue com separador de caminho, tempo de `defer` não-parseável, comentário em branco, dois `@bookmark`) |
 
 Regras de streams:
 

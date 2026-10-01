@@ -1,7 +1,8 @@
 // Package cli — Status commands: done (with close as alias), reopen and
 // status. These own process concerns (files, stdio); the transition
 // rules themselves live in internal/issue, and status validation in
-// internal/vault.
+// internal/vault. Each command accepts an optional trailing comment and
+// writes it, when given, in the same write as the transition.
 package cli
 
 import (
@@ -18,63 +19,92 @@ import (
 	"github.com/Sanmoo/my-tasks2/internal/vault"
 )
 
-// newDoneCmd builds `mt done <id>` (alias `close`): closes the Issue —
-// status done, completed_at stamped now.
+// transitionCommentLong documents the trailing-comment rule that done,
+// reopen and status share. The rule itself lives in commentText and
+// addComment; this is how the tool explains it in `mt help`.
+const transitionCommentLong = `A trailing comment (the arguments after the ID, joined with spaces) is
+appended to the Issue's Comments section exactly as mt comment writes one —
+heading, text and stable anchor — in the same write as the transition, so
+the comment and the transition carry one timestamp. A blank comment is a
+usage error (exit 2).`
+
+// newDoneCmd builds `mt done <id> [comment]` (alias `close`): closes the
+// Issue — status done, completed_at stamped now — appending the trailing
+// comment, when given, in the same write.
 func newDoneCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:     "done <id>",
+		Use:     "done <id> [comment]",
 		Aliases: []string{"close"},
 		Short:   "Close an Issue (stamp completed_at)",
+		Long:    "done closes the Issue: status done and completed_at stamped now.\n\n" + transitionCommentLong,
 		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) != 1 {
-				return exitcode.Usage(fmt.Errorf("done needs exactly one issue ID"))
+			if len(args) < 1 {
+				return exitcode.Usage(errors.New("done needs an issue ID"))
 			}
 			return nil
 		},
 		ValidArgsFunction: completeIssueID,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runMutation(cmd, args[0], func(i issue.Issue) issue.Issue {
-				return i.Done(time.Now().Format(issue.NaiveLayout))
+			text, err := commentText(args[1:])
+			if err != nil {
+				return err
+			}
+			now := time.Now().Format(issue.NaiveLayout)
+			return runMutation(cmd, args[0], func(i issue.Issue) (issue.Issue, error) {
+				return withTransitionComment(i.Done(now), text, now)
 			})
 		},
 	}
 }
 
-// newReopenCmd builds `mt reopen <id>`: back to open, clearing
-// completed_at and started_at.
+// newReopenCmd builds `mt reopen <id> [comment]`: back to open, clearing
+// completed_at and started_at, appending the trailing comment, when given,
+// in the same write.
 func newReopenCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "reopen <id>",
+		Use:   "reopen <id> [comment]",
 		Short: "Reopen an Issue (clear completed_at and started_at)",
+		Long:  "reopen returns the Issue to open, clearing completed_at and started_at.\n\n" + transitionCommentLong,
 		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) != 1 {
-				return exitcode.Usage(fmt.Errorf("reopen needs exactly one issue ID"))
+			if len(args) < 1 {
+				return exitcode.Usage(errors.New("reopen needs an issue ID"))
 			}
 			return nil
 		},
 		ValidArgsFunction: completeIssueID,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runMutation(cmd, args[0], func(i issue.Issue) issue.Issue {
-				return i.Reopen()
+			text, err := commentText(args[1:])
+			if err != nil {
+				return err
+			}
+			now := time.Now().Format(issue.NaiveLayout)
+			return runMutation(cmd, args[0], func(i issue.Issue) (issue.Issue, error) {
+				return withTransitionComment(i.Reopen(), text, now)
 			})
 		},
 	}
 }
 
-// newStatusCmd builds `mt status <id> <status>`: the free transition,
-// validated against the vault's configured status list.
+// newStatusCmd builds `mt status <id> <status> [comment]`: the free
+// transition, validated against the vault's configured status list,
+// appending the trailing comment, when given, in the same write.
 func newStatusCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "status <id> <status>",
+		Use:   "status <id> <status> [comment]",
 		Short: "Set an Issue's status (free transition)",
+		Long:  "status sets the Issue's status to any status the Vault lists, without touching timestamps.\n\n" + transitionCommentLong,
 		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) != 2 {
-				return exitcode.Usage(fmt.Errorf("status needs an issue ID and a status"))
+			if len(args) < 2 {
+				return exitcode.Usage(errors.New("status needs an issue ID and a status"))
 			}
 			return nil
 		},
 		ValidArgsFunction: completeIssueID,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			text, err := commentText(args[2:])
+			if err != nil {
+				return err
+			}
 			t, err := resolveVaultForKey(cmd, args[0])
 			if err != nil {
 				return err
@@ -87,17 +117,29 @@ func newStatusCmd() *cobra.Command {
 				return fmt.Errorf("status %q is not in the vault's status list (valid: %s)",
 					args[1], strings.Join(vcfg.StatusList(), ", "))
 			}
-			return applyMutation(cmd, t, args[0], func(i issue.Issue) issue.Issue {
-				return i.SetStatus(args[1])
+			now := time.Now().Format(issue.NaiveLayout)
+			return applyMutation(cmd, t, args[0], func(i issue.Issue) (issue.Issue, error) {
+				return withTransitionComment(i.SetStatus(args[1]), text, now)
 			})
 		},
 	}
 }
 
+// withTransitionComment returns i with text appended as a Comment when the
+// transition carries one, or i unchanged when it does not. The heading and
+// the transition's own timestamps come from the caller's single now read,
+// so a comment and the transition it rides share one instant.
+func withTransitionComment(i issue.Issue, text, now string) (issue.Issue, error) {
+	if text == "" {
+		return i, nil
+	}
+	return addComment(i, text, now)
+}
+
 // runMutation is the shared body of done and reopen: resolve the vault
 // from the key, then apply the mutation to the Issue. Resolution errors
 // already name the failing step, so they propagate unwrapped.
-func runMutation(cmd *cobra.Command, id string, mutate func(issue.Issue) issue.Issue) error {
+func runMutation(cmd *cobra.Command, id string, mutate func(issue.Issue) (issue.Issue, error)) error {
 	t, err := resolveVaultForKey(cmd, id)
 	if err != nil {
 		return err
@@ -111,7 +153,7 @@ func runMutation(cmd *cobra.Command, id string, mutate func(issue.Issue) issue.I
 // applyMutation applies and persists a mutation, then prints the new
 // status — with the Issue's title when it has one. It is the shared
 // tail of done, reopen, status and pick-next.
-func applyMutation(cmd *cobra.Command, t vaultTarget, id string, mutate func(issue.Issue) issue.Issue) error {
+func applyMutation(cmd *cobra.Command, t vaultTarget, id string, mutate func(issue.Issue) (issue.Issue, error)) error {
 	i, err := mutateIssue(t, id, mutate)
 	if err != nil {
 		return err
@@ -136,10 +178,13 @@ func titleSuffix(title string) string {
 }
 
 // mutateIssue loads the Issue for id, applies mutate and persists the
-// result. Callers own any command-specific confirmation output. When
-// the Issue is missing, the error carries the target's vault context
-// (prefix-picked vault named, or hint for explicit selections).
-func mutateIssue(t vaultTarget, id string, mutate func(issue.Issue) issue.Issue) (issue.Issue, error) {
+// result. A mutation that cannot be applied — a comment anchor that
+// cannot be allocated — fails here, before anything is written, so the
+// Issue file is either the old one or the fully mutated one. Callers own
+// any command-specific confirmation output. When the Issue is missing,
+// the error carries the target's vault context (prefix-picked vault
+// named, or hint for explicit selections).
+func mutateIssue(t vaultTarget, id string, mutate func(issue.Issue) (issue.Issue, error)) (issue.Issue, error) {
 	if err := checkID(id); err != nil {
 		return issue.Issue{}, err
 	}
@@ -147,7 +192,10 @@ func mutateIssue(t vaultTarget, id string, mutate func(issue.Issue) issue.Issue)
 	if err != nil {
 		return issue.Issue{}, err
 	}
-	i = mutate(i)
+	i, err = mutate(i)
+	if err != nil {
+		return issue.Issue{}, err
+	}
 	if err := writeIssueFile(t.dir, id, i); err != nil {
 		return issue.Issue{}, err
 	}

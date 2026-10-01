@@ -121,6 +121,7 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^the file "([^"]*)" contains (\d+) occurrences of "([^"]*)"$`, fileContainsNOccurrences)
 	sc.Step(`^the file "([^"]*)" does not contain "([^"]*)"$`, fileDoesNotContain)
 	sc.Step(`^the file "([^"]*)" matches "([^"]*)"$`, fileMatches)
+	sc.Step(`^the file "([^"]*)" has the same timestamp in "([^"]*)" and "([^"]*)"$`, fileHasSameTimestamp)
 	sc.Step(`^the directory "([^"]*)" contains (\d+) files$`, dirContainsNFiles)
 	sc.Step(`^the file "([^"]*)" is written with:$`, fileWrittenWith)
 }
@@ -536,6 +537,52 @@ func fileMatches(ctx context.Context, path, pattern string) (context.Context, er
 		return ctx, fmt.Errorf("%q does not match %q:\n%s", path, pattern, data)
 	}
 	return ctx, nil
+}
+
+// naiveTimestamp is the timestamp shape every stamped line carries
+// (YYYY-MM-DDTHH:MM), the same one the frontmatter timestamps use.
+var naiveTimestamp = regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}`)
+
+// fileHasSameTimestamp asserts that the first line starting with each of two
+// prefixes carries the same naive timestamp. It is how a scenario pins that
+// one clock read feeds both halves of a single write — a comment heading and
+// the completed_at of the transition it rides, say.
+func fileHasSameTimestamp(ctx context.Context, path, first, second string) (context.Context, error) {
+	st, err := stateFrom(ctx)
+	if err != nil {
+		return ctx, err
+	}
+	path = st.expand(path)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ctx, fmt.Errorf("reading %q: %w", path, err)
+	}
+	one, ok := stampedTime(string(data), st.expand(first))
+	if !ok {
+		return ctx, fmt.Errorf("%q stamps no timestamp on a line starting with %q:\n%s", path, first, data)
+	}
+	two, ok := stampedTime(string(data), st.expand(second))
+	if !ok {
+		return ctx, fmt.Errorf("%q stamps no timestamp on a line starting with %q:\n%s", path, second, data)
+	}
+	if one != two {
+		return ctx, fmt.Errorf("%q stamps %s for %q but %s for %q", path, one, first, two, second)
+	}
+	return ctx, nil
+}
+
+// stampedTime returns the first naive timestamp on a line starting with
+// prefix, reporting whether such a line exists.
+func stampedTime(data, prefix string) (string, bool) {
+	for _, line := range strings.Split(data, "\n") {
+		if !strings.HasPrefix(line, prefix) {
+			continue
+		}
+		if ts := naiveTimestamp.FindString(line); ts != "" {
+			return ts, true
+		}
+	}
+	return "", false
 }
 
 func dirContainsNFiles(ctx context.Context, path, want string) (context.Context, error) {

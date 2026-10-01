@@ -53,8 +53,8 @@ func runDefer(cmd *cobra.Command, id, when string) error {
 		// invocation: a usage error (exit 2), like a bad rank position.
 		return exitcode.Usage(err)
 	}
-	if _, err := mutateIssue(t, id, func(i issue.Issue) issue.Issue {
-		return i.Defer(until)
+	if _, err := mutateIssue(t, id, func(i issue.Issue) (issue.Issue, error) {
+		return i.Defer(until), nil
 	}); err != nil {
 		return err
 	}

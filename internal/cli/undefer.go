@@ -61,8 +61,8 @@ func runUndeferOne(cmd *cobra.Command, id string) error {
 		return fmt.Errorf("issue %s has no deferred_until to undefer", id)
 	}
 	was := i.Frontmatter.DeferredUntil
-	i, err = mutateIssue(t, id, func(i issue.Issue) issue.Issue {
-		return i.Undefer()
+	i, err = mutateIssue(t, id, func(i issue.Issue) (issue.Issue, error) {
+		return i.Undefer(), nil
 	})
 	if err != nil {
 		return err
@@ -93,8 +93,8 @@ func runUndeferAll(cmd *cobra.Command) error {
 		if !list.DeferralExpired(until, now) {
 			continue
 		}
-		if _, err := mutateIssue(vaultTarget{dir: vaultDir}, it.ID, func(i issue.Issue) issue.Issue {
-			return i.Undefer()
+		if _, err := mutateIssue(vaultTarget{dir: vaultDir}, it.ID, func(i issue.Issue) (issue.Issue, error) {
+			return i.Undefer(), nil
 		}); err != nil {
 			return err
 		}

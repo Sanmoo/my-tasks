@@ -125,6 +125,7 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(newBottomCmd())
 	cmd.AddCommand(newRankCmd())
 	cmd.AddCommand(newUnrankCmd())
+	cmd.AddCommand(newPlaceCmd())
 	cmd.AddCommand(newCommentCmd())
 	cmd.AddCommand(newBookmarkCmd())
 	cmd.AddCommand(newListCmd())

@@ -80,7 +80,7 @@ Resumo:
 | Comando | O que faz |
 | --- | --- |
 | `mt init [dir]` | cria um Vault (`issues/` + `mt.yaml`) |
-| `mt create <título>` | cria uma Issue (`-t`/`-b` entram direto na fila) |
+| `mt create <título>` | cria uma Issue (encaixa por padrão; `--no-place` deixa no Backlog) |
 | `mt q <título>` | cria uma Issue e imprime só o ID (mesmas flags do create) |
 | `mt show <id>` | mostra a Issue renderizada (header, metadados, corpo) |
 | `mt edit <id>` | abre a Issue no `$EDITOR` |
@@ -98,6 +98,7 @@ Resumo:
 | `mt prioritize` | prioriza no `$EDITOR` (fila × Backlog) |
 | `mt top <id>` / `mt bottom <id>` | move para a primeira/última posição da fila |
 | `mt rank <id> <n>` | insere na posição `n` da fila |
+| `mt place <id>` | descobre o Rank por Comparações (busca binária) |
 | `mt unrank <id>` | devolve a Issue ao Backlog |
 | `mt check [--fix]` | audita a integridade do Vault |
 | `mt bookmark add/list/rm` | gerencia a config global |
@@ -144,8 +145,20 @@ mt q "anotar rápido"
   (mesma semântica do `mt top`); imprime `Created <id> (rank <n>)`.
 - `-b`/`--bottom` — cria a Issue já no fim da fila (mesma semântica do
   `mt bottom`); imprime `Created <id> (rank <n>)`.
-- `-t` e `-b` juntas → erro de uso (exit 2). Sem flag, a Issue vai ao
-  Backlog e a saída é inalterada; `q` imprime só o ID em todos os casos.
+- `--no-place` — cria sem a sessão de Encaixe: a Issue fica no Backlog,
+  exatamente como antes de o `place` existir.
+- `--answers <seq>` — responde à sessão sem interação: um caractere por
+  Comparação (`a`, `b`, `i` ou `q`), na ordem.
+- `-t` e `-b` juntas, `--no-place` com `-t`/`-b`, ou `--answers` com
+  qualquer um desses três → erro de uso (exit 2).
+
+Sem `--no-place` nem posição explícita, `create`/`q` **encaixam** a Issue
+recém-criada por Comparações (ver [`mt place`](#mt-place-id)). A sessão só
+abre quando há um terminal no **stdout**: em pipe, script ou
+`ID=$(mt q "ideia")` a Issue fica no Backlog e o comando nunca espera uma
+resposta. O ID/confirmação sai no stdout **antes** das perguntas, que vão
+para o stderr — então `q` continua imprimindo só o ID, mesmo se a sessão for
+cancelada no meio.
 
 ```sh
 mt create "urgente" --top
@@ -153,6 +166,13 @@ mt create "urgente" --top
 
 mt q "ideia" --bottom
 # → pkm-1x9d        (entra no fim da fila, saída continua só o ID)
+
+mt create "decidir agora"
+# → Created pkm-2k7p
+#   (no terminal, antes disso: as Comparações; no stderr)
+
+mt create "ideia crua" --no-place
+# → Created pkm-9z1m       (Backlog)
 ```
 
 ### `mt show <id>` e `mt edit <id>`
@@ -372,11 +392,62 @@ mt unrank pkm-055       # de volta ao Backlog
 ```
 
 `create`/`q` aceitam `--top`/`--bottom` para criar a Issue já na fila com a
-mesma semântica destes comandos (sem precisar rodá-los em seguida).
+mesma semântica destes comandos (sem precisar rodá-los em seguida); sem
+posição explícita, quem descobre a posição é o Encaixe
+([`mt place`](#mt-place-id)).
 
 Como no `prioritize`, a fila é renormalizada e só os arquivos alterados são
 reescritos. Posição fora da fila atual → erro (exit 1); posição que não é
 inteiro positivo → erro de uso (exit 2).
+
+### `mt place <id>`
+
+Descobre o Rank de uma Issue perguntando, uma Comparação por vez, qual de
+duas Issues é mais prioritária:
+
+```text
+Which is more prioritized? (1/5)
+  a) ○ pkm-055  comprar material
+  b) ○ pkm-07r0  revisar orçamento
+a (first), b (second) or i (indifferent); q cancels:
+```
+
+- A opção `a` é **sempre** a Issue sendo encaixada e `b` a Candidata — a
+  Issue que ocupa o meio do intervalo corrente da fila.
+- Cada resposta corta o intervalo de ranks pela metade: uma fila de N Issues
+  gasta no máximo ⌈log₂(N+1)⌉ Comparações, o mínimo possível para inserir um
+  item numa lista já ordenada. O contador `(i/total)` mostra o teto, e a
+  sessão pode terminar antes dele.
+- `i` (indiferente) deixa a ordem já gravada decidir: a Issue entra logo
+  depois daquela Candidata. Não existe empate — Rank é único por vault.
+- `q`, Ctrl-C ou o fim da entrada cancelam a sessão: **nada** é escrito
+  (exit 1), e a Issue que já estava na fila não se move.
+- A lista de referência é a fila: Issues `open`/`in_progress` ranqueadas,
+  inclusive adiadas ou bloqueadas (Deferral diz "não agora", não "não
+  importa"). Issue no Backlog e Issue `done`/status customizado nunca são
+  Candidatas, e uma Issue `done` é recusada de saída.
+- Fila sem nenhuma Issue ranqueada → nenhuma Comparação, rank 1.
+- A Issue pode já estar na fila: ela sai da lista de referência (ninguém se
+  compara consigo mesma) e volta no Ponto de encaixe.
+- Vault com Rank duplicado é recusado antes da primeira Comparação
+  (`run mt check --fix`): a ordem é ambígua para o `pick-next`, e a sessão
+  não pode prometer uma posição que o resto da ferramenta não honra.
+- Sem terminal no **stdout** e sem `--answers` o comando falha (exit 1) em
+  vez de virar um no-op silencioso — o terminal é o sinal de que há alguém
+  para responder.
+
+O Ponto de encaixe é aplicado pelo mesmo plano do `mt rank <id> <n>`: a fila
+é renormalizada 1..N, os ranks não-priorizáveis seguem em N+1..M, e só os
+arquivos cujo rank mudou são reescritos.
+
+```sh
+mt place pkm-055                 # sessão interativa no terminal
+mt place pkm-055 --answers ab    # sem interação: a, b, i ou q, na ordem
+# → Placed pkm-055 at rank 2
+```
+
+`--answers` que não cobre a sessão inteira, ou um caractere que não é
+resposta, é erro de uso (exit 2) e nada é aplicado.
 
 ### `mt check [--fix]`
 

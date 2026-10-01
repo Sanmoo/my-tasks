@@ -4,8 +4,13 @@ Two seams, agreed in the spec (.scratch/mt-tracker/spec.md, Testing Decisions):
 
 - **Seam 1 — the CLI process (primary, highest):** e2e with Gherkin via
   [godog], running the **compiled binary** against a temporary Vault per
-  scenario. `$EDITOR` is a fake script for headless editor flows.
-  Assertions: stdout, stderr, exit code, files on disk. Every user story
+  scenario. `$EDITOR` is a fake script for headless editor flows. The step
+  `I run \`mt …\` at a terminal, typing:` gives the run a pseudo-terminal
+  (util-linux `script(1)`), which is the only way to reach the flows that ask
+  only for a human at a terminal (`mt place`); a terminal merges stdout and
+  stderr, so those scenarios assert on the merged text and on the files, and
+  each typed line is confirmed with a newline (a pty never hands over a partial
+  line). Assertions: stdout, stderr, exit code, files on disk. Every user story
   becomes a scenario.
 - **Seam 2 — exported APIs of pure logic:** black-box unit tests of the
   decision-dense packages (datetime parsing, frontmatter round-trip, rank
@@ -50,7 +55,8 @@ e2e/
   main_test.go     TestMain: builds the binary once, runs the godog suite
   features/        *.feature — one scenario per user story
   steps/           step definitions; per-scenario state in the context
-  support/         harness helpers: binary, temporary Vault, fake $EDITOR, env isolation
+  support/         harness helpers: binary, temporary Vault, fake $EDITOR, env
+                   isolation, pseudo-terminal runs (support.RunCmdPTY)
 scripts/           coverage-gate.sh
 ```
 

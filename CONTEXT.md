@@ -62,3 +62,7 @@ _Avoid_: status blocked, bloqueada
 
 **Status**:
 O estado de uma issue: `open`, `in_progress`, `done`, mais status personalizados definidos na configuração do vault. Não há máquina de estados imposta; apenas `pick-next` (→ `in_progress`, pulando issues blocked) e `done` (terminal) têm comportamento especial.
+
+**Comment**:
+Um bloco de texto datado anexado ao fim do corpo da Issue, preservado para sempre (append-only), identificado dentro da Issue por uma âncora estável. Não é campo de frontmatter nem status: uma transição pode carregar um Comment, mas ele é escrito no corpo, na mesma gravação — nenhum metadado guarda o texto.
+_Avoid_: nota, anotação, observação, motivo de fechamento, close reason

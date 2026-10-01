@@ -93,9 +93,10 @@ scripts/           coverage-gate.sh
   assertion arguments.
 - Assertion steps available beyond the basics: `stdout matches "<regex>"`,
   `stdout does not contain "…"`, `the file "…" matches "<regex>"`, `the file
-  "…" does not contain "…"`, `the directory "…" contains <n> files`, and the
-  docstring step `the fake editor writes` (replaces the fake $EDITOR's content
-  for editor-flow scenarios).
+  "…" does not contain "…"`, `the file "…" has the same timestamp in "…" and
+  "…"` (pins that a single clock read feeds both stamped lines), `the
+  directory "…" contains <n> files`, and the docstring step `the fake editor
+  writes` (replaces the fake $EDITOR's content for editor-flow scenarios).
 - Scenarios prepare files with the docstring step
   `the file "<path>" is written with:` (the following indented block is the
   file content, parent directories are created).

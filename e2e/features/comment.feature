@@ -6,7 +6,8 @@ Feature: Comment
   content is preserved byte-for-byte. The append logic and the anchor
   token are decision-dense pure logic covered at Seam 2 (internal/issue);
   these scenarios cover the process: the compiled binary against a
-  temporary Vault.
+  temporary Vault. The status transitions append a comment the same way,
+  and honour the same blank-text rule.
 
   Background:
     When I run `mt init --prefix pkm <vault>`
@@ -64,3 +65,12 @@ Feature: Comment
     When I run `mt comment --vault <vault> pkm-0001`
     Then the exit code is 2
     And stderr contains "comment needs"
+
+  Scenario: comment with a blank text is a usage error
+    When I run `mt create --vault <vault> t`
+    Then the exit code is 0
+    And I remember the issue ID
+    When I run `mt comment --vault <vault> <id> "   "`
+    Then the exit code is 2
+    And stderr contains "comment text is blank"
+    And the file "<vault>/issues/<id>.md" does not contain "<!-- comment: "

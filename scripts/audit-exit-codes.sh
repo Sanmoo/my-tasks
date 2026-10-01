@@ -73,6 +73,10 @@ run status "$ID1" bogus
 run status "$ID1"
 run done
 run done a b
+run done "$ID1" ""
+run reopen "$ID1" "   "
+run status "$ID1" open ""
+run status "$ID1" open comment on a transition
 
 label "defer"
 run defer "$ID1" +2d
@@ -142,6 +146,7 @@ run pick-next extra
 
 label "comment"
 run comment "$ID1" hello there
+run comment "$ID1" ""
 run comment "$ID1"
 run comment
 

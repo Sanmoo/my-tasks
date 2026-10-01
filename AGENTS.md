@@ -25,7 +25,7 @@ O rebase garante o fast-forward; se o `--ff-only` falhar, volte ao rebase — nu
 
 ### Issue tracker
 
-Issues e specs deste repo vivem como arquivos Markdown em `.scratch/`. See `docs/agents/issue-tracker.md`.
+Issues e specs deste repo vivem no GitHub Issues (`Sanmoo/my-tasks`); tickets anteriores à migração ficam em `.scratch/` como histórico. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

@@ -31,6 +31,12 @@ _Avoid_: prioridade, ordem (ordem é a sequência resultante; rank é o valor qu
 O conjunto de issues sem rank, abaixo da fila priorizada. É onde as ideias vivem até serem priorizadas.
 _Avoid_: normal, não-priorizadas
 
+**Fila**:
+A sequência das Issues de um Vault na ordem de Rank: menor Rank primeiro;
+o Backlog (Issues sem Rank) por último, ordenado por `created_at`; e o ID
+como desempate final em todos os níveis.
+_Avoid_: prioridade (prioridade é o valor de Rank; fila é a sequência resultante), ordenação, sequence
+
 **Encaixe**:
 A operação de descobrir o Rank de uma Issue comparando-a com as Issues já na fila, uma de cada vez. É o que `mt place` faz e o que `mt create`/`mt q` fazem por padrão.
 _Avoid_: priorizar, ordenar, inserir
@@ -62,6 +68,16 @@ _Avoid_: due date, prazo
 **Blocked**:
 Estado computável de uma issue: ela está blocked enquanto alguma issue listada no campo `blocked_by` (mesmo vault) não está `done`. Não é um status — não há transição nem operação de desbloqueio; fechar o bloqueador desbloqueia sozinho.
 _Avoid_: status blocked, bloqueada
+
+**Disponível**:
+A predicação canônica de disponibilidade: uma Issue está disponível quando
+está `open`, sua Deferral (se houver) já passou e nada não-`done` a bloqueia.
+As nuances, nomeadas em um lugar só: `in_progress`, status customizado e
+`done` nunca são disponíveis; uma Deferral malformada não impede a
+disponibilidade (`mt check` é quem valida formato); uma referência em
+`blocked_by` a um ID inexistente mantém a Issue Blocked; só `done` satisfaz um
+bloqueio; uma lista vazia de bloqueios nunca bloqueia.
+_Avoid_: liberada, elegível, pronta (não confundir com o comando `ready`)
 
 **Status**:
 O estado de uma issue: `open`, `in_progress`, `done`, mais status personalizados definidos na configuração do vault. Não há máquina de estados imposta; apenas `pick-next` (→ `in_progress`, pulando issues blocked) e `done` (terminal) têm comportamento especial.

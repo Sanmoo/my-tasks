@@ -8,7 +8,6 @@ package cli
 import (
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -192,10 +191,7 @@ func mutateIssue(t vaultTarget, id string, mutate func(issue.Issue) (issue.Issue
 	}
 	item, err := issuefiles.Open(t.dir).Mutate(id, mutate)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return issue.Issue{}, t.notFoundError(id)
-		}
-		return issue.Issue{}, err
+		return issue.Issue{}, t.mapNotFound(err, id)
 	}
 	return item.Issue, nil
 }
@@ -209,10 +205,7 @@ func mutateIssue(t vaultTarget, id string, mutate func(issue.Issue) (issue.Issue
 func readIssue(t vaultTarget, id string) (issue.Issue, error) {
 	item, err := issuefiles.Open(t.dir).Read(id)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return issue.Issue{}, t.notFoundError(id)
-		}
-		return issue.Issue{}, err
+		return issue.Issue{}, t.mapNotFound(err, id)
 	}
 	return item.Issue, nil
 }

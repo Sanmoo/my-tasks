@@ -155,12 +155,13 @@ func placementAction(top, bottom bool) *priority.QuickAction {
 
 // runCreate writes a new Issue with title and labels and prints its ID
 // (just the ID when quiet, a confirmation line otherwise). With a
-// placement action the Issue is created already in the queue: the
+// placement action the new Issue is created already in the queue: the
 // quick-order plan — the same one behind `mt top`/`mt bottom` — computes
-// its rank and the shifts of the Issues it displaces. Otherwise place
-// carries the implicit Encaixe session: the Issue is written first (the
-// capture must not depend on the questions) and the rank it converges to is
-// applied afterwards.
+// its rank and the shifts of the Issues it displaces before anything is
+// written, so a planning or displaced-write failure leaves no stray
+// Issue behind. Otherwise place carries the implicit Encaixe session:
+// the Issue is written first (the capture must not depend on the
+// questions) and the rank it converges to is applied afterwards.
 func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, placement *priority.QuickAction, place placeRequest) error {
 	vaultDir, err := resolveVault(cmd)
 	if err != nil {
@@ -173,7 +174,7 @@ func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, pl
 	if vcfg.Prefix == "" {
 		return fmt.Errorf("vault %s has no ID prefix in its config — set prefix in mt.yaml", vaultDir)
 	}
-	id, err := issuefiles.Open(vaultDir).Create(vcfg.Prefix, issue.Issue{
+	newIssue := issue.Issue{
 		Frontmatter: issue.Frontmatter{
 			Title:     title,
 			Status:    "open",
@@ -181,25 +182,29 @@ func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, pl
 			CreatedAt: time.Now().Format(issue.NaiveLayout),
 		},
 		Body: issue.DefaultBody,
-	}, rand.Reader)
-	if err != nil {
-		return err
 	}
 	rank := 0
 	if placement != nil {
-		var others []priority.Change
-		rank, others, err = planCreatePlacement(vaultDir, id, *placement)
+		issues, err := loadPriorityIssues(vaultDir)
 		if err != nil {
 			return err
 		}
-		// Rewrite the displaced Issues before the new Issue receives its
-		// rank, so the rank it takes (e.g. 1) is never duplicated on disk.
+		var others []priority.Change
+		rank, others, err = planCreatePlacement(vcfg.Prefix, issues, *placement)
+		if err != nil {
+			return err
+		}
+		// The displaced Issues are rewritten before the new file lands, so
+		// the rank the new Issue takes (e.g. 1) is never duplicated on disk
+		// by the Issue it displaces.
 		if err := applyRankChanges(vaultDir, others); err != nil {
 			return err
 		}
-		if err := writeRank(vaultDir, id, &rank); err != nil {
-			return err
-		}
+		newIssue.Frontmatter.Rank = &rank
+	}
+	id, err := issuefiles.Open(vaultDir).Create(vcfg.Prefix, newIssue, rand.Reader)
+	if err != nil {
+		return err
 	}
 	switch {
 	case quiet:
@@ -219,35 +224,55 @@ func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, pl
 }
 
 // planCreatePlacement computes where a new Issue enters the queue when
-// created with --top/--bottom: it reuses the quick-order plan (the same
-// single source of truth as `mt top`/`mt bottom`) over the Vault as it is
-// now — the new Issue included, unranked, since the store's Create already
-// wrote it. It returns the new Issue's rank and the rank changes of the
-// Issues it displaces; the caller applies the displaced changes first and
-// the new Issue's rank last, so the rank it takes is never duplicated on
-// disk.
-func planCreatePlacement(vaultDir, id string, action priority.QuickAction) (int, []priority.Change, error) {
-	issues, err := loadPriorityIssues(vaultDir)
-	if err != nil {
-		return 0, nil, err
-	}
-	changes, err := priority.QuickPlan(issues, id, action, 0)
+// created with --top/--bottom, before its file exists: it reuses the
+// quick-order plan (the same single source of truth as `mt top`/`mt
+// bottom`) over the Vault as it is now plus a synthetic unranked item
+// standing in for the newcomer. The newcomer needs an identity in the
+// plan, but its real ID is allocated only by the store's Create; the
+// placeholder comes from the Vault prefix, never collides with an ID
+// already loaded, and never reaches disk or output. The function returns
+// the new Issue's rank and the rank changes of the Issues it displaces;
+// the caller applies the displaced changes first and creates the new
+// Issue with its final rank, so the rank it takes is never duplicated on
+// disk and a planning failure leaves no stray Issue behind.
+func planCreatePlacement(prefix string, issues []priority.Issue, action priority.QuickAction) (int, []priority.Change, error) {
+	placeholder := syntheticIssueID(prefix, issues)
+	changes, err := priority.QuickPlan(append(issues, priority.Issue{
+		ID:     placeholder,
+		Status: "open",
+	}), placeholder, action, 0)
 	if err != nil {
 		return 0, nil, err
 	}
 	rank, others := 0, make([]priority.Change, 0, len(changes))
 	found := false
 	for _, ch := range changes {
-		if ch.ID == id && ch.Rank != nil {
+		if ch.ID == placeholder && ch.Rank != nil {
 			rank, found = *ch.Rank, true
 			continue
 		}
 		others = append(others, ch)
 	}
 	if !found {
-		return 0, nil, fmt.Errorf("planning the queue placement of %s: no rank was planned", id)
+		return 0, nil, fmt.Errorf("planning the queue placement: no rank was planned")
 	}
 	return rank, others, nil
+}
+
+// syntheticIssueID returns the placeholder identity the placement plan
+// uses for the Issue about to be created: the Vault prefix plus a
+// suffix, extended while it collides with an ID already loaded. It is
+// only a plan input — the placeholder is never written or printed.
+func syntheticIssueID(prefix string, issues []priority.Issue) string {
+	taken := make(map[string]bool, len(issues))
+	for _, is := range issues {
+		taken[is.ID] = true
+	}
+	id := issue.NewID(prefix, "0")
+	for taken[id] {
+		id += "0"
+	}
+	return id
 }
 
 // newShowCmd builds `mt show <id>`: renders the structured, colored
@@ -284,10 +309,7 @@ These compact output flags are mutually exclusive.`,
 			}
 			item, err := issuefiles.Open(t.dir).Read(args[0])
 			if err != nil {
-				if errors.Is(err, os.ErrNotExist) {
-					return t.notFoundError(args[0])
-				}
-				return err
+				return t.mapNotFound(err, args[0])
 			}
 			i := item.Issue
 			if oneLine {
@@ -336,10 +358,16 @@ func newEditCmd() *cobra.Command {
 				return err
 			}
 			if err := issuefiles.Open(t.dir).Edit(args[0], editFile); err != nil {
-				if errors.Is(err, os.ErrNotExist) {
-					return t.notFoundError(args[0])
+				// Only the store's refusal is relabelled: it is the same core
+				// refusal every single-read path renders — "reading issue <id>:
+				// issue <id> is not a regular file". An $EDITOR failure is not a
+				// read failure and keeps its own message; absence still becomes
+				// the target's not-found error.
+				var notRegular *issuefiles.NotRegularError
+				if errors.As(err, &notRegular) {
+					err = fmt.Errorf("reading issue %s: %w", args[0], err)
 				}
-				return err
+				return t.mapNotFound(err, args[0])
 			}
 			return nil
 		},

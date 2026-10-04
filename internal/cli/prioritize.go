@@ -6,7 +6,6 @@
 package cli
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
@@ -171,10 +170,7 @@ func writeRank(vaultDir, id string, rank *int) error {
 		i.Frontmatter.Rank = rank
 		return i, nil
 	})
-	if errors.Is(err, os.ErrNotExist) {
-		return vaultTarget{dir: vaultDir}.notFoundError(id)
-	}
-	return err
+	return vaultTarget{dir: vaultDir}.mapNotFound(err, id)
 }
 
 const prioritizeLong = `prioritize opens $EDITOR on a buffer of the vault's open and in_progress

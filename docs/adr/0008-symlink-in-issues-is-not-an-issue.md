@@ -27,13 +27,21 @@ usa `O_CREATE|O_EXCL` mais `O_NOFOLLOW`, fechando a corrida entre descobrir
 e abrir. No Unix, `O_NOFOLLOW` no `open` fecha a mesma corrida na leitura e
 na escrita.
 
+Symlinks e diretórios `*.md` são pulados em **todo** caminho, então a
+única diferença entre eles é **quem erra** numa entrada não-regular que não
+é diretório (FIFO, device): os caminhos sãos de listagem e leitura
+(`List`, `ListFiles` e `Read`) **falham alto** nela, enquanto `IDs` **a
+omite** — a completion nunca pode oferecer um nome que os comandos
+recusam.
+
 O resto da política de arquivo é preservado byte a byte e agora também
 está escrito: uma entrada `.md` que é **diretório** continua sendo pulada
 (um diretório acidental não vira Issue fantasma); uma entrada
 **não-regular que não é diretório** (FIFO, device) continua **falhando
-alto** (um Vault quebrado não passa silencioso); um `issues/` **ilegível**
-continua produzindo erro claro; e `Open` **não carrega `mt.yaml`** — o
-módulo recebe o diretório e não decide o que é um Vault, então os comandos
-que hoje operam sem o arquivo de configuração continuam operando sem ele.
-Num Vault sem symlinks, nada muda: a mudança de comportamento é
-exatamente esta, isolada num commit.
+alto** nos caminhos sãos de listagem e leitura (um Vault quebrado não
+passa silencioso); um `issues/` **ilegível** continua produzindo erro
+claro; e `Open` **não carrega `mt.yaml`** — o módulo recebe o diretório e
+não decide o que é um Vault, então os comandos que hoje operam sem o
+arquivo de configuração continuam operando sem ele. Num Vault sem
+symlinks, nada muda: a mudança de comportamento é exatamente esta,
+isolada num commit.

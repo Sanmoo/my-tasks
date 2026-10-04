@@ -5,6 +5,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -308,6 +309,18 @@ func (t vaultTarget) notFoundError(id string) error {
 	default:
 		return fmt.Errorf("issue %s not found", id)
 	}
+}
+
+// mapNotFound maps a store error to the target's not-found error when
+// it reports absence — a wrapped os.ErrNotExist — and returns any other
+// error unchanged. Every single-Issue read funnels through it, so the
+// vault context of "issue <id> not found" is built in one place and the
+// store's own errors keep their own wording.
+func (t vaultTarget) mapNotFound(err error, id string) error {
+	if errors.Is(err, os.ErrNotExist) {
+		return t.notFoundError(id)
+	}
+	return err
 }
 
 const rootLong = `mt is a personal, git-friendly issue tracker: one Markdown file per Issue,

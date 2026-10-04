@@ -161,24 +161,31 @@ func TestMutateReportsAnUnwritableIssueFile(t *testing.T) {
 	}
 }
 
-func TestEditHandsTheAbsoluteValidatedPathToTheCallback(t *testing.T) {
-	dir := newVault(t)
-	writeIssue(t, dir, "pkm-aaa", validIssue("edit me"))
+// TestEditHandsThePathTheStoreBuiltToTheCallback pins that Edit does not
+// resolve the path: the callback receives exactly the path the Store
+// built from its own directory, so a Vault addressed by a relative
+// directory reaches $EDITOR relatively (user story 12) and the editor
+// opens the same file mt reads.
+func TestEditHandsThePathTheStoreBuiltToTheCallback(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if err := os.MkdirAll(filepath.Join("vault", "issues"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join("vault", "issues", "pkm-aaa.md")
+	if err := os.WriteFile(path, []byte(validIssue("edit me")), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	var gotPath string
-	err := issuefiles.Open(dir).Edit("pkm-aaa", func(path string) error {
+	err := issuefiles.Open("vault").Edit("pkm-aaa", func(path string) error {
 		gotPath = path
 		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want, err := filepath.Abs(issuePath(dir, "pkm-aaa"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if gotPath != want {
-		t.Errorf("Edit() path = %q, want the absolute path %q", gotPath, want)
+	if gotPath != path {
+		t.Errorf("Edit() path = %q, want the path the Store built %q", gotPath, path)
 	}
 }
 

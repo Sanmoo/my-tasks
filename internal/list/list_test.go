@@ -171,24 +171,135 @@ func TestIsFutureDeferred(t *testing.T) {
 	}
 }
 
-func TestReady(t *testing.T) {
+// TestAvailable is the single truth table of availability (Seam 2):
+// status × Deferral × blocked state over the exported whole-Vault
+// predicate. Each case is a whole vault — the wanted IDs are listed in
+// the vault's input order, so the table also pins that unavailable
+// Issues drop out without the available ones being reordered.
+func TestAvailable(t *testing.T) {
 	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
+	blockedBy := func(it issue.Item, ids ...string) issue.Item {
+		it.Issue.Frontmatter.BlockedBy = ids
+		return it
+	}
 	cases := []struct {
-		name string
-		it   issue.Item
-		want bool
+		name  string
+		items []issue.Item
+		want  []string
 	}{
-		{"open without deferral is ready", item("open", "open", nil, "", ""), true},
-		{"open with past deferral is ready", item("past", "open", nil, "", "2026-08-10T08:00"), true},
-		{"open at deferred time is ready", item("now", "open", nil, "", "2026-08-15T12:00"), true},
-		{"future-deferred open is not ready", item("future", "open", nil, "", "2026-08-20T08:00"), false},
-		{"in-progress is not ready", item("progress", "in_progress", nil, "", ""), false},
-		{"done is not ready", item("done", "done", nil, "", ""), false},
+		{name: "empty vault"},
+		{
+			name:  "open without deferral or blockers is available",
+			items: []issue.Item{item("open", "open", nil, "", "")},
+			want:  []string{"open"},
+		},
+		{
+			name:  "empty blocked_by never blocks",
+			items: []issue.Item{blockedBy(item("open", "open", nil, "", ""))},
+			want:  []string{"open"},
+		},
+		{
+			name:  "in_progress is never available",
+			items: []issue.Item{item("progress", "in_progress", nil, "", "")},
+		},
+		{
+			name:  "custom status is never available",
+			items: []issue.Item{item("waiting", "waiting", nil, "", "")},
+		},
+		{
+			name:  "done is never available",
+			items: []issue.Item{item("closed", "done", nil, "", "")},
+		},
+		{
+			name:  "past deferral is available",
+			items: []issue.Item{item("past", "open", nil, "", "2026-08-10T08:00")},
+			want:  []string{"past"},
+		},
+		{
+			name:  "deferral exactly at now is available",
+			items: []issue.Item{item("at-now", "open", nil, "", "2026-08-15T12:00")},
+			want:  []string{"at-now"},
+		},
+		{
+			name:  "malformed deferral does not remove availability",
+			items: []issue.Item{item("malformed", "open", nil, "", "not-a-date")},
+			want:  []string{"malformed"},
+		},
+		{
+			name:  "future deferral is unavailable",
+			items: []issue.Item{item("future", "open", nil, "", "2026-08-20T08:00")},
+		},
+		{
+			name: "only a done blocker satisfies a block",
+			items: []issue.Item{
+				item("blocker-closed", "done", nil, "", ""),
+				blockedBy(item("subject", "open", nil, "", ""), "blocker-closed"),
+			},
+			want: []string{"subject"},
+		},
+		{
+			name: "an open blocker blocks",
+			items: []issue.Item{
+				item("blocker-open", "open", nil, "", ""),
+				blockedBy(item("subject", "open", nil, "", ""), "blocker-open"),
+			},
+			want: []string{"blocker-open"},
+		},
+		{
+			name: "an in_progress blocker blocks",
+			items: []issue.Item{
+				item("blocker-progress", "in_progress", nil, "", ""),
+				blockedBy(item("subject", "open", nil, "", ""), "blocker-progress"),
+			},
+		},
+		{
+			name: "one non-done blocker among done ones is enough",
+			items: []issue.Item{
+				item("blocker-closed", "done", nil, "", ""),
+				item("blocker-progress", "in_progress", nil, "", ""),
+				blockedBy(item("subject", "open", nil, "", ""), "blocker-closed", "blocker-progress"),
+			},
+		},
+		{
+			name: "dangling blocked_by keeps the Issue blocked",
+			items: []issue.Item{
+				blockedBy(item("subject", "open", nil, "", ""), "ghost"),
+			},
+		},
+		{
+			name: "blocked and future-deferred is unavailable once",
+			items: []issue.Item{
+				item("blocker-progress", "in_progress", nil, "", ""),
+				blockedBy(item("subject", "open", nil, "", "2026-08-20T08:00"), "blocker-progress"),
+			},
+		},
+		{
+			name: "only done satisfies the block, a deferred blocker still blocks",
+			items: []issue.Item{
+				item("deferred", "open", nil, "", "2026-08-20T08:00"),
+				blockedBy(item("subject", "open", nil, "", ""), "deferred"),
+			},
+		},
+		{
+			name: "available Issues keep the input order",
+			items: []issue.Item{
+				item("second-rank", "open", intPtr(2), "2026-08-15T09:00", ""),
+				item("progress", "in_progress", intPtr(1), "2026-08-15T09:00", ""),
+				item("first-rank", "open", intPtr(1), "2026-08-15T09:00", ""),
+				item("future", "open", nil, "2026-08-15T09:00", "2026-08-20T08:00"),
+			},
+			want: []string{"second-rank", "first-rank"},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := list.Ready(c.it, now); got != c.want {
-				t.Errorf("Ready(%s) = %t, want %t", c.name, got, c.want)
+			before := slices.Clone(ids(c.items))
+			got := list.Available(c.items, now)
+			if gotIDs := ids(got); !slices.Equal(gotIDs, c.want) {
+				t.Errorf("Available() = %v, want %v", gotIDs, c.want)
+			}
+			if after := ids(c.items); !slices.Equal(after, before) {
+				t.Errorf("Available() reordered its input: %v, want %v", after, before)
 			}
 		})
 	}

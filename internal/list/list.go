@@ -1,9 +1,10 @@
 // Package list holds the pure logic of `mt list` and `mt pick-next`: the
 // Rank ordering of issues (Rank → Backlog by created_at → ID), the
 // per-status glyphs, the visibility rules (only done hides by default;
-// status/label filters), the deferred-until availability/suffix rules,
-// the computed blocked state (an Issue is blocked while any ID in its
-// blocked_by is not done), and duplicate-rank detection. It is
+// status/label filters), the single availability predicate over the
+// whole Vault and its deferred-until suffix rules, the computed blocked
+// state (an Issue is blocked while any ID in its blocked_by is not
+// done), and duplicate-rank detection. It is
 // decision-dense, so it lives at Seam 2: black-box unit tested, with the
 // coverage and mutation gates. Reading the issue files themselves lives
 // in internal/issuefiles.
@@ -102,14 +103,37 @@ func IsFutureDeferred(deferredUntil string, now time.Time) bool {
 	return ok && t.After(now)
 }
 
-// Ready reports whether item is an open Issue that is temporally
-// available at now: its deferral, if any, has passed. Blocked state is
-// computed separately against the whole Vault (see Blocked); callers
-// that mean "available" combine both. An empty or malformed
-// deferred_until does not prevent availability; mt check owns
-// validation of persisted datetime fields.
-func Ready(item issue.Item, now time.Time) bool {
-	return item.Issue.Frontmatter.Status == "open" && !IsFutureDeferred(item.Issue.Frontmatter.DeferredUntil, now)
+// Available returns the Vault's available Issues at now, in the input
+// order. It is the single availability predicate — ready iterates its
+// result and pick-next orders it — so no caller builds the status index
+// (StatusByID) or combines halves by hand: available means open, its
+// Deferral (if any) has passed, and nothing not done blocks it.
+//
+// The canonical definition, with its nuances named here: in_progress,
+// custom statuses and done are never available; an empty or malformed
+// deferred_until does not remove availability (mt check owns format
+// validation); a blocked_by reference to an ID absent from the Vault
+// keeps the Issue Blocked; only done satisfies a block; an empty
+// blocked_by never blocks. Blocked stays a separate question for the
+// [blocked] marker of the listing: a future-deferred Issue is
+// unavailable without being Blocked.
+func Available(items []issue.Item, now time.Time) []issue.Item {
+	statusByID := StatusByID(items)
+	available := make([]issue.Item, 0, len(items))
+	for _, item := range items {
+		fm := item.Issue.Frontmatter
+		if fm.Status != "open" {
+			continue
+		}
+		if IsFutureDeferred(fm.DeferredUntil, now) {
+			continue
+		}
+		if Blocked(fm.BlockedBy, statusByID) {
+			continue
+		}
+		available = append(available, item)
+	}
+	return available
 }
 
 // Overdue reports whether item has a Deadline before now and is not done.
@@ -256,28 +280,16 @@ func Visible(item issue.Item, opts Options) bool {
 // PickNext returns the first available open Issue under the Rank order:
 // the lowest rank wins; when no ranked candidate is
 // available, the oldest Backlog Issue wins, with ID as the final tie-break.
-// Future-deferred and blocked Issues are unavailable, while a deferred_until
-// exactly at now is available. Duplicate ranks anywhere in the vault are rejected
-// before candidate selection, including ranks on non-open Issues.
+// Availability comes from Available — it is not re-stated here — so a
+// deferred_until exactly at now is available. Duplicate ranks anywhere in
+// the vault are rejected before candidate selection, including ranks on
+// non-open Issues.
 func PickNext(items []issue.Item, now time.Time) (issue.Item, error) {
 	if dups := DuplicateRanks(items); len(dups) > 0 {
 		return issue.Item{}, fmt.Errorf("duplicate rank: %d", dups[0])
 	}
 
-	statusByID := StatusByID(items)
-	candidates := make([]issue.Item, 0, len(items))
-	for _, item := range items {
-		if item.Issue.Frontmatter.Status != "open" {
-			continue
-		}
-		if IsFutureDeferred(item.Issue.Frontmatter.DeferredUntil, now) {
-			continue
-		}
-		if Blocked(item.Issue.Frontmatter.BlockedBy, statusByID) {
-			continue
-		}
-		candidates = append(candidates, item)
-	}
+	candidates := Available(items, now)
 	if len(candidates) == 0 {
 		return issue.Item{}, errors.New("no available open issues")
 	}

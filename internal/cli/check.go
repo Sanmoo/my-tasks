@@ -59,10 +59,8 @@ func runCheck(cmd *cobra.Command, fix bool) error {
 	}
 	if fix {
 		changes := priority.RenormalizeRanks(priorityIssuesFromCheckItems(items))
-		for _, change := range changes {
-			if err := applyCheckRankChange(vaultDir, change); err != nil {
-				return err
-			}
+		if err := applyRankChanges(vaultDir, changes); err != nil {
+			return err
 		}
 		fmt.Fprintf(cmd.OutOrStdout(), "Fixed %d Ranks\n", len(changes))
 		items, err = loadCheckItems(vaultDir)
@@ -121,15 +119,6 @@ func priorityIssuesFromCheckItems(items []issue.Item) []priority.Issue {
 		issues = append(issues, priorityIssueFrom(item.ID, item.Issue))
 	}
 	return issues
-}
-
-func applyCheckRankChange(vaultDir string, change priority.Change) error {
-	i, err := readIssue(vaultTarget{dir: vaultDir}, change.ID)
-	if err != nil {
-		return err
-	}
-	i.Frontmatter.Rank = change.Rank
-	return writeIssueFile(vaultDir, change.ID, i)
 }
 
 // validateVault runs the per-Issue schema checks (frontmatter values,

@@ -179,28 +179,25 @@ func titleSuffix(title string) string {
 }
 
 // mutateIssue loads the Issue for id, applies mutate and persists the
-// result. A mutation that cannot be applied — a comment anchor that
-// cannot be allocated — fails here, before anything is written, so the
-// Issue file is either the old one or the fully mutated one. Callers own
-// any command-specific confirmation output. When the Issue is missing,
-// the error carries the target's vault context (prefix-picked vault
-// named, or hint for explicit selections).
+// result through the store's single write door. A mutation that cannot
+// be applied — a comment anchor that cannot be allocated — fails inside
+// the store before anything is written, so the Issue file is either the
+// old one or the fully mutated one. Callers own any command-specific
+// confirmation output. When the Issue is missing, the error carries the
+// target's vault context (prefix-picked vault named, or hint for
+// explicit selections).
 func mutateIssue(t vaultTarget, id string, mutate func(issue.Issue) (issue.Issue, error)) (issue.Issue, error) {
 	if err := checkID(id); err != nil {
 		return issue.Issue{}, err
 	}
-	i, err := readIssue(t, id)
+	item, err := issuefiles.Open(t.dir).Mutate(id, mutate)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return issue.Issue{}, t.notFoundError(id)
+		}
 		return issue.Issue{}, err
 	}
-	i, err = mutate(i)
-	if err != nil {
-		return issue.Issue{}, err
-	}
-	if err := writeIssueFile(t.dir, id, i); err != nil {
-		return issue.Issue{}, err
-	}
-	return i, nil
+	return item.Issue, nil
 }
 
 // readIssue loads the Issue file for id in the target vault through
@@ -218,28 +215,4 @@ func readIssue(t vaultTarget, id string) (issue.Issue, error) {
 		return issue.Issue{}, err
 	}
 	return item.Issue, nil
-}
-
-// writeIssueFile renders i and writes it back to its file in the vault.
-// It is the shared render-and-persist tail of the mutating commands; the
-// O_NOFOLLOW flag prevents a symlink from redirecting the write outside the
-// Vault. The confirmation line is the caller's concern.
-func writeIssueFile(vaultDir, id string, i issue.Issue) error {
-	data, err := issue.Render(i)
-	if err != nil {
-		return err
-	}
-	f, err := openIssueFile(vaultDir, id, os.O_WRONLY|os.O_TRUNC)
-	if err != nil {
-		return fmt.Errorf("writing issue %s: %w", id, err)
-	}
-	_, writeErr := f.Write(data)
-	closeErr := f.Close()
-	if writeErr != nil {
-		return fmt.Errorf("writing issue %s: %w", id, writeErr)
-	}
-	if closeErr != nil {
-		return fmt.Errorf("closing issue %s: %w", id, closeErr)
-	}
-	return nil
 }

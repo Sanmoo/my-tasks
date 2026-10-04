@@ -185,12 +185,12 @@ func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, pl
 	}
 	rank := 0
 	if placement != nil {
-		issues, err := loadPriorityIssues(vaultDir)
+		items, err := loadItems(vaultDir)
 		if err != nil {
 			return err
 		}
-		var others []priority.Change
-		rank, others, err = planCreatePlacement(vcfg.Prefix, issues, *placement)
+		var others []issue.Change
+		rank, others, err = planCreatePlacement(vcfg.Prefix, items, *placement)
 		if err != nil {
 			return err
 		}
@@ -235,16 +235,18 @@ func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, pl
 // the caller applies the displaced changes first and creates the new
 // Issue with its final rank, so the rank it takes is never duplicated on
 // disk and a planning failure leaves no stray Issue behind.
-func planCreatePlacement(prefix string, issues []priority.Issue, action priority.QuickAction) (int, []priority.Change, error) {
-	placeholder := syntheticIssueID(prefix, issues)
-	changes, err := priority.QuickPlan(append(issues, priority.Issue{
-		ID:     placeholder,
-		Status: "open",
+func planCreatePlacement(prefix string, items []issue.Item, action priority.QuickAction) (int, []issue.Change, error) {
+	placeholder := syntheticIssueID(prefix, items)
+	changes, err := priority.QuickPlan(append(items, issue.Item{
+		ID: placeholder,
+		Issue: issue.Issue{Frontmatter: issue.Frontmatter{
+			Status: "open",
+		}},
 	}), placeholder, action, 0)
 	if err != nil {
 		return 0, nil, err
 	}
-	rank, others := 0, make([]priority.Change, 0, len(changes))
+	rank, others := 0, make([]issue.Change, 0, len(changes))
 	found := false
 	for _, ch := range changes {
 		if ch.ID == placeholder && ch.Rank != nil {
@@ -263,10 +265,10 @@ func planCreatePlacement(prefix string, issues []priority.Issue, action priority
 // uses for the Issue about to be created: the Vault prefix plus a
 // suffix, extended while it collides with an ID already loaded. It is
 // only a plan input — the placeholder is never written or printed.
-func syntheticIssueID(prefix string, issues []priority.Issue) string {
-	taken := make(map[string]bool, len(issues))
-	for _, is := range issues {
-		taken[is.ID] = true
+func syntheticIssueID(prefix string, items []issue.Item) string {
+	taken := make(map[string]bool, len(items))
+	for _, it := range items {
+		taken[it.ID] = true
 	}
 	id := issue.NewID(prefix, "0")
 	for taken[id] {

@@ -5,25 +5,21 @@
 // it lives at Seam 2: black-box unit tested, with the coverage and
 // mutation gates. Reading and writing the issue files themselves lives
 // in internal/issuefiles.
+//
+// Every mechanism here speaks the domain's single Issue line (issue.Item)
+// and orders it by the domain's single Fila rule (issue.Compare): this
+// package decides *when* to ask and *which* positions move, never what the
+// order is. Its only repository dependency is internal/issue — the
+// deliberate descent recorded in docs/adr/0009.
 package priority
 
 import (
-	"cmp"
 	"fmt"
 	"slices"
 	"strings"
-)
 
-// Issue is the minimal view of an Issue the prioritize flow needs: the ID
-// (the file name authority), title, status, rank (nil = Backlog) and
-// created_at (the Backlog ordering key).
-type Issue struct {
-	ID        string
-	Title     string
-	Status    string
-	Rank      *int
-	CreatedAt string
-}
+	"github.com/Sanmoo/my-tasks2/internal/issue"
+)
 
 // Prioritizable reports whether an issue of status s participates in the
 // prioritize buffer: open and in_progress do; done and any custom status
@@ -38,72 +34,27 @@ const bufferHeader = `# Edit ranking for this vault
 # Do not edit issue IDs. Save and close to continue.
 `
 
-// Buffer builds the $EDITOR buffer for issues: the instruction header, a
-// blank line, then one line per issue in buffer order — ranked issues
+// Buffer builds the $EDITOR buffer for items: the instruction header, a
+// blank line, then one line per item in buffer order — ranked items
 // first (lowest rank first), then the Backlog ordered by created_at, then
-// ID as the final tiebreak. A ranked issue is written "[P] <id>  <title>"
-// and a Backlog issue "[ ] <id>  <title>". It does not mutate issues.
-func Buffer(issues []Issue) string {
-	ordered := slices.Clone(issues)
-	slices.SortFunc(ordered, Compare)
+// ID as the final tiebreak. That is the domain's Fila order
+// (issue.Compare): the buffer renders it, it does not own it. A ranked
+// issue is written "[P] <id>  <title>" and a Backlog issue
+// "[ ] <id>  <title>". It does not mutate items.
+func Buffer(items []issue.Item) string {
+	ordered := slices.Clone(items)
+	slices.SortFunc(ordered, issue.Compare)
 	var b strings.Builder
 	b.WriteString(bufferHeader)
 	b.WriteByte('\n')
-	for _, is := range ordered {
+	for _, it := range ordered {
 		marker := "[ ]"
-		if is.Rank != nil {
+		if it.Issue.Frontmatter.Rank != nil {
 			marker = "[P]"
 		}
-		fmt.Fprintf(&b, "%s %s  %s\n", marker, is.ID, is.Title)
+		fmt.Fprintf(&b, "%s %s  %s\n", marker, it.ID, it.Issue.Frontmatter.Title)
 	}
 	return b.String()
-}
-
-// Compare orders two issues for the prioritize buffer: lower rank first
-// (issues without a rank form the Backlog and come last, ordered by
-// created_at), then ID as the final tiebreak. It returns a negative value
-// when a sorts before b, zero when they are equal, and a positive value
-// otherwise — the cmp.Compare convention, so it plugs into slices.SortFunc.
-func Compare(a, b Issue) int {
-	if a.Rank != nil && b.Rank != nil {
-		if c := cmp.Compare(*a.Rank, *b.Rank); c != 0 {
-			return c
-		}
-		return cmp.Compare(a.ID, b.ID)
-	}
-	if a.Rank != nil {
-		return -1
-	}
-	if b.Rank != nil {
-		return 1
-	}
-	if c := cmp.Compare(a.CreatedAt, b.CreatedAt); c != 0 {
-		return c
-	}
-	return cmp.Compare(a.ID, b.ID)
-}
-
-// RenormalizeRanks computes the minimal changes needed to make every ranked
-// Issue's Rank contiguous from 1 through N. It includes every status because
-// Rank is a vault-wide invariant; Backlog Issues remain unranked. Existing
-// order is preserved by Rank and ID when duplicate Ranks need a tiebreak.
-func RenormalizeRanks(issues []Issue) []Change {
-	ranked := make([]Issue, 0, len(issues))
-	for _, is := range issues {
-		if is.Rank != nil {
-			ranked = append(ranked, is)
-		}
-	}
-	slices.SortFunc(ranked, Compare)
-	changes := make([]Change, 0, len(ranked))
-	for index, is := range ranked {
-		target := index + 1
-		if is.Rank != nil && *is.Rank == target {
-			continue
-		}
-		changes = append(changes, Change{ID: is.ID, Rank: &target})
-	}
-	return changes
 }
 
 // Entry is one data line of the buffer: whether the line is prioritized
@@ -172,20 +123,13 @@ func parseLine(line string) (Entry, error) {
 	return Entry{Prioritized: prioritized, ID: fields[0]}, nil
 }
 
-// Change is a computed target rank for one issue. Rank == nil means the
-// issue returns to the Backlog (its rank is removed).
-type Change struct {
-	ID   string
-	Rank *int
-}
-
-// Plan validates entries against the vault's issues and computes the rank
+// Plan validates entries against the vault's Items and computes the rank
 // changes to apply. [P] entries get ranks 1..N in buffer order; [ ]
 // entries go to the Backlog. Ranked issues that are not prioritizable
 // (done or a custom status) are not in the buffer, but Rank is a
 // vault-wide invariant, so they keep their ranks renumbered after the
-// queue (N+1..M) in their existing rank order. It returns a Change only
-// for issues whose rank actually differs from their current rank —
+// queue (N+1..M) in their existing rank order. It returns an issue.Change
+// only for issues whose rank actually differs from their current rank —
 // unchanged issues yield no change, so the caller rewrites only what
 // moved (zero churn).
 //
@@ -193,10 +137,10 @@ type Change struct {
 // a non-prioritizable issue (done or a custom status), a duplicate ID, or
 // when a prioritizable issue is missing from the buffer. Nothing is
 // applied on failure.
-func Plan(entries []Entry, issues []Issue) ([]Change, error) {
-	byID := make(map[string]Issue, len(issues))
-	for _, is := range issues {
-		byID[is.ID] = is
+func Plan(entries []Entry, items []issue.Item) ([]issue.Change, error) {
+	byID := make(map[string]issue.Item, len(items))
+	for _, it := range items {
+		byID[it.ID] = it
 	}
 	seen := make(map[string]bool, len(entries))
 	for _, e := range entries {
@@ -204,20 +148,20 @@ func Plan(entries []Entry, issues []Issue) ([]Change, error) {
 			return nil, fmt.Errorf("duplicate issue ID %q in the buffer", e.ID)
 		}
 		seen[e.ID] = true
-		is, ok := byID[e.ID]
+		it, ok := byID[e.ID]
 		if !ok {
 			return nil, fmt.Errorf("unknown issue ID %q", e.ID)
 		}
-		if !Prioritizable(is.Status) {
-			return nil, fmt.Errorf("issue %s is %s and cannot be prioritized", e.ID, is.Status)
+		if status := it.Issue.Frontmatter.Status; !Prioritizable(status) {
+			return nil, fmt.Errorf("issue %s is %s and cannot be prioritized", e.ID, status)
 		}
 	}
-	for _, is := range issues {
-		if Prioritizable(is.Status) && !seen[is.ID] {
-			return nil, fmt.Errorf("issue %s is missing from the buffer", is.ID)
+	for _, it := range items {
+		if Prioritizable(it.Issue.Frontmatter.Status) && !seen[it.ID] {
+			return nil, fmt.Errorf("issue %s is missing from the buffer", it.ID)
 		}
 	}
-	changes := make([]Change, 0, len(entries))
+	changes := make([]issue.Change, 0, len(entries))
 	rank := 0
 	for _, e := range entries {
 		var target *int
@@ -226,26 +170,26 @@ func Plan(entries []Entry, issues []Issue) ([]Change, error) {
 			r := rank
 			target = &r
 		}
-		if !rankEqual(byID[e.ID].Rank, target) {
-			changes = append(changes, Change{ID: e.ID, Rank: target})
+		if !rankEqual(byID[e.ID].Issue.Frontmatter.Rank, target) {
+			changes = append(changes, issue.Change{ID: e.ID, Rank: target})
 		}
 	}
 	// Ranked issues outside the buffer (done, custom statuses) follow the
 	// queue at N+1..M in their existing rank order, so the vault keeps
 	// unique contiguous ranks — a duplicate would make mt check fail and
 	// mt pick-next refuse to select.
-	rest := make([]Issue, 0)
-	for _, is := range issues {
-		if is.Rank != nil && !Prioritizable(is.Status) {
-			rest = append(rest, is)
+	rest := make([]issue.Item, 0)
+	for _, it := range items {
+		if it.Issue.Frontmatter.Rank != nil && !Prioritizable(it.Issue.Frontmatter.Status) {
+			rest = append(rest, it)
 		}
 	}
-	slices.SortFunc(rest, Compare)
-	for _, is := range rest {
+	slices.SortFunc(rest, issue.Compare)
+	for _, it := range rest {
 		rank++
 		r := rank
-		if !rankEqual(is.Rank, &r) {
-			changes = append(changes, Change{ID: is.ID, Rank: &r})
+		if !rankEqual(it.Issue.Frontmatter.Rank, &r) {
+			changes = append(changes, issue.Change{ID: it.ID, Rank: &r})
 		}
 	}
 	return changes, nil

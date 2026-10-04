@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Sanmoo/my-tasks2/internal/exitcode"
+	"github.com/Sanmoo/my-tasks2/internal/issue"
 	"github.com/Sanmoo/my-tasks2/internal/priority"
 )
 
@@ -77,14 +78,14 @@ func runQuickOrder(cmd *cobra.Command, id string, action priority.QuickAction, p
 	if err != nil {
 		return err
 	}
-	issues, err := loadPriorityIssues(t.dir)
+	items, err := loadItems(t.dir)
 	if err != nil {
 		return err
 	}
-	if (t.byPrefix != "" || t.hint != "") && !containsIssue(issues, id) {
+	if (t.byPrefix != "" || t.hint != "") && !containsItem(items, id) {
 		return t.notFoundError(id)
 	}
-	changes, err := priority.QuickPlan(issues, id, action, position)
+	changes, err := priority.QuickPlan(items, id, action, position)
 	if err != nil {
 		return err
 	}
@@ -99,10 +100,10 @@ func runQuickOrder(cmd *cobra.Command, id string, action priority.QuickAction, p
 	return nil
 }
 
-// containsIssue reports whether id is among the vault's Issues.
-func containsIssue(issues []priority.Issue, id string) bool {
-	for _, is := range issues {
-		if is.ID == id {
+// containsItem reports whether id is among the vault's Items.
+func containsItem(items []issue.Item, id string) bool {
+	for _, it := range items {
+		if it.ID == id {
 			return true
 		}
 	}

@@ -76,11 +76,10 @@ func runPlace(cmd *cobra.Command, id, answers string) error {
 	if err != nil {
 		return err
 	}
-	issues := priorityIssuesFromItems(items)
-	if (t.byPrefix != "" || t.hint != "") && !containsIssue(issues, id) {
+	if (t.byPrefix != "" || t.hint != "") && !containsItem(items, id) {
 		return t.notFoundError(id)
 	}
-	if _, err := priority.PlacementTarget(issues, id); err != nil {
+	if _, err := priority.PlacementTarget(items, id); err != nil {
 		return err
 	}
 	if err := checkNoDuplicateRanks(items); err != nil {
@@ -89,7 +88,7 @@ func runPlace(cmd *cobra.Command, id, answers string) error {
 	if !sessionAvailable(cmd, answers) {
 		return fmt.Errorf("place needs a terminal to ask the Comparações; use --answers for a non-interactive session")
 	}
-	rank, err := runPlaceSession(cmd, t.dir, issues, id, answers)
+	rank, err := runPlaceSession(cmd, t.dir, items, id, answers)
 	if errors.Is(err, errPlaceAborted) {
 		return fmt.Errorf("placement of %s cancelled: the queue is unchanged", id)
 	}
@@ -118,7 +117,7 @@ func placeNewIssue(cmd *cobra.Command, vaultDir, id, answers string) error {
 	if !sessionAvailable(cmd, answers) {
 		return nil
 	}
-	rank, err := runPlaceSession(cmd, vaultDir, priorityIssuesFromItems(items), id, answers)
+	rank, err := runPlaceSession(cmd, vaultDir, items, id, answers)
 	switch {
 	case errors.Is(err, errPlaceAborted):
 		// The Issue is already saved; the session was the optional part. The
@@ -134,16 +133,16 @@ func placeNewIssue(cmd *cobra.Command, vaultDir, id, answers string) error {
 
 // runPlaceSession asks the Comparações for id and returns the rank they
 // converge to, applying it through the quick-order plan (the single source of
-// truth for the resulting rank shifts). issues must be the vault as it is on
+// truth for the resulting rank shifts). items must be the vault as it is on
 // disk, id included. Nothing is written until the session ends, so a cancelled
 // session leaves the queue untouched.
-func runPlaceSession(cmd *cobra.Command, vaultDir string, issues []priority.Issue, id, answers string) (int, error) {
-	target, err := priority.PlacementTarget(issues, id)
+func runPlaceSession(cmd *cobra.Command, vaultDir string, items []issue.Item, id, answers string) (int, error) {
+	target, err := priority.PlacementTarget(items, id)
 	if err != nil {
 		return 0, err
 	}
 	out := cmd.ErrOrStderr()
-	place := priority.NewPlace(priority.Candidates(issues, id))
+	place := priority.NewPlace(priority.Candidates(items, id))
 	replies := newAnswerReader(cmd, answers)
 	for {
 		candidate, ok := place.Question()
@@ -164,7 +163,7 @@ func runPlaceSession(cmd *cobra.Command, vaultDir string, issues []priority.Issu
 		place.Answer(answer)
 	}
 	rank := place.Rank()
-	changes, err := priority.QuickPlan(issues, id, priority.MoveToRank, rank)
+	changes, err := priority.QuickPlan(items, id, priority.MoveToRank, rank)
 	if err != nil {
 		return 0, err
 	}
@@ -202,12 +201,9 @@ func checkNoDuplicateRanks(items []issue.Item) error {
 }
 
 // placeLine renders one side of a Comparação: the compact one-line view of
-// `mt list`, built from the priority projection the session works with.
-func placeLine(is priority.Issue) string {
-	return list.FormatLine(issue.Item{ID: is.ID, Issue: issue.Issue{Frontmatter: issue.Frontmatter{
-		Title:  is.Title,
-		Status: is.Status,
-	}}})
+// `mt list` — the domain's Item already carries everything the line needs.
+func placeLine(item issue.Item) string {
+	return list.FormatLine(item)
 }
 
 // answerReader yields the replies to a session's Comparações: from the batch

@@ -1,6 +1,8 @@
 // Package list_test holds the black-box unit tests of the mt list pure
-// logic (Seam 2): the priority ordering comparator, the per-status
-// glyphs, the deferred-until rules, and duplicate-rank detection.
+// logic (Seam 2): the ordering the vistas hand to their consumers (Sort,
+// PickNext — the order rule itself is the domain's, issue.Compare), the
+// per-status glyphs, the deferred-until rules, and duplicate-rank
+// detection.
 package list_test
 
 import (
@@ -53,34 +55,6 @@ func ids(items []issue.Item) []string {
 	return out
 }
 
-func TestCompare(t *testing.T) {
-	rank1 := intPtr(1)
-	rank2 := intPtr(2)
-	cases := []struct {
-		name string
-		a, b issue.Item
-		want int
-	}{
-		{"lower rank first", item("a", "open", rank1, "", ""), item("b", "open", rank2, "", ""), -1},
-		{"higher rank last", item("b", "open", rank2, "", ""), item("a", "open", rank1, "", ""), 1},
-		{"ranked before backlog", item("a", "open", rank1, "", ""), item("b", "open", nil, "", ""), -1},
-		{"backlog after ranked", item("b", "open", nil, "", ""), item("a", "open", rank1, "", ""), 1},
-		{"equal rank tiebreak by id", item("b", "open", rank1, "", ""), item("a", "open", rank1, "", ""), 1},
-		{"equal rank equal id is equal", item("a", "open", rank1, "", ""), item("a", "open", rank1, "", ""), 0},
-		{"backlog older created_at first", item("a", "open", nil, "2026-08-15T09:30", ""), item("b", "open", nil, "2026-08-16T09:30", ""), -1},
-		{"backlog newer created_at last", item("b", "open", nil, "2026-08-16T09:30", ""), item("a", "open", nil, "2026-08-15T09:30", ""), 1},
-		{"backlog equal created_at tiebreak by id", item("b", "open", nil, "2026-08-15T09:30", ""), item("a", "open", nil, "2026-08-15T09:30", ""), 1},
-		{"backlog equal everything is equal", item("a", "open", nil, "2026-08-15T09:30", ""), item("a", "open", nil, "2026-08-15T09:30", ""), 0},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			if got := list.Compare(c.a, c.b); got != c.want {
-				t.Errorf("Compare(%s, %s) = %d, want %d", c.a.ID, c.b.ID, got, c.want)
-			}
-		})
-	}
-}
-
 func TestSortOrdersByRankThenBacklogCreatedAtThenID(t *testing.T) {
 	r1, r2 := intPtr(1), intPtr(2)
 	items := []issue.Item{
@@ -106,7 +80,7 @@ func TestSortDoesNotReorderAnEmptyOrSingleList(t *testing.T) {
 }
 
 func TestSortIsStableForItemsThatCompareEqual(t *testing.T) {
-	// Two items that Compare equal (same rank, created_at and ID) must
+	// Two items that order equal (same rank, created_at and ID) must
 	// keep their relative order under a stable sort. Their titles differ
 	// so the test can tell them apart.
 	mk := func(title string) issue.Item {

@@ -150,8 +150,8 @@ func runPlaceSession(cmd *cobra.Command, vaultDir string, items []issue.Item, id
 			break
 		}
 		fmt.Fprintf(out, "Which is more prioritized? (%d/%d)\n", place.Asked()+1, place.Total())
-		fmt.Fprintf(out, "  a) %s\n", placeLine(target))
-		fmt.Fprintf(out, "  b) %s\n", placeLine(candidate))
+		fmt.Fprintf(out, "  a) %s\n", list.FormatLine(target))
+		fmt.Fprintf(out, "  b) %s\n", list.FormatLine(candidate))
 		fmt.Fprint(out, "a (first), b (second) or i (indifferent); q cancels: ")
 		answer, ok, err := replies.next()
 		if err != nil {
@@ -198,12 +198,6 @@ func checkNoDuplicateRanks(items []issue.Item) error {
 		return fmt.Errorf("duplicate rank: %d (run mt check --fix)", dups[0])
 	}
 	return nil
-}
-
-// placeLine renders one side of a Comparação: the compact one-line view of
-// `mt list` — the domain's Item already carries everything the line needs.
-func placeLine(item issue.Item) string {
-	return list.FormatLine(item)
 }
 
 // answerReader yields the replies to a session's Comparações: from the batch

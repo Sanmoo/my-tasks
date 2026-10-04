@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 
 	"github.com/Sanmoo/my-tasks2/internal/issue"
 )
@@ -36,9 +35,10 @@ func (s Store) Mutate(id string, mutate func(issue.Issue) (issue.Issue, error)) 
 
 // Edit validates the Issue (it exists, is a regular file and its ID is
 // a single path component) BEFORE the path leaves the Store, then hands
-// the absolute path to edit — the $EDITOR invocation of mt edit. A
-// symlink is refused here, so the editor is never pointed outside the
-// Vault.
+// the path to edit exactly as the Store built it — a Vault addressed by
+// a relative directory reaches $EDITOR relatively, so the editor opens
+// the same file mt reads. A symlink is refused here, so the editor is
+// never pointed outside the Vault.
 func (s Store) Edit(id string, edit func(path string) error) error {
 	if err := checkID(id); err != nil {
 		return err
@@ -46,11 +46,7 @@ func (s Store) Edit(id string, edit func(path string) error) error {
 	if err := s.checkRegular(id); err != nil {
 		return err
 	}
-	path, err := filepath.Abs(s.path(id))
-	if err != nil {
-		return fmt.Errorf("resolving issue %s: %w", id, err)
-	}
-	return edit(path)
+	return edit(s.path(id))
 }
 
 // Create allocates a fresh ID for prefix, renders i and writes it as a
@@ -88,18 +84,16 @@ func (s Store) Create(prefix string, i issue.Issue, rng io.Reader) (string, erro
 // link is never chosen — and it is what keeps Create away from a
 // symlink.
 func (s Store) takenIDs() (map[string]bool, error) {
-	entries, err := s.readDir()
+	entries, err := s.scanIssues()
 	if err != nil {
 		return nil, err
 	}
 	taken := make(map[string]bool, len(entries))
 	for _, entry := range entries {
-		if entry.IsDir() {
+		if entry.kind == kindDirectory {
 			continue
 		}
-		if id, ok := issueID(entry); ok {
-			taken[id] = true
-		}
+		taken[entry.id] = true
 	}
 	return taken, nil
 }

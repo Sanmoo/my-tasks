@@ -12,8 +12,10 @@ import (
 )
 
 // mkfifo creates a named pipe: the canary non-regular, non-directory
-// entry. A Vault with one must fail loud — silent skipping is only for
-// symlinks and directories.
+// entry. The sound paths (List, ListFiles) must fail loud on it —
+// silent skipping is only for symlinks and *.md directories — while
+// IDs, the completion path, omits it rather than offering a name the
+// commands refuse.
 func mkfifo(t *testing.T, path string) {
 	t.Helper()
 	if err := syscall.Mkfifo(path, 0o644); err != nil {
@@ -30,6 +32,24 @@ func TestListFailsLoudOnANonRegularIssueFile(t *testing.T) {
 	var notRegular *issuefiles.NotRegularError
 	if !errors.As(err, &notRegular) {
 		t.Fatalf("List() with a FIFO = %v, want NotRegularError", err)
+	}
+	if got, want := notRegular.ID, "pkm-fifo"; got != want {
+		t.Errorf("NotRegularError.ID = %q, want %q", got, want)
+	}
+}
+
+// TestListFilesFailsLoudOnANonRegularIssueFile pins that the check path
+// (ListFiles) shares the loud failure of List: both read an entry the
+// scan classified as non-regular and neither skips it silently.
+func TestListFilesFailsLoudOnANonRegularIssueFile(t *testing.T) {
+	dir := newVault(t)
+	writeIssue(t, dir, "pkm-real", validIssue("real"))
+	mkfifo(t, issuePath(dir, "pkm-fifo"))
+
+	_, err := issuefiles.Open(dir).ListFiles()
+	var notRegular *issuefiles.NotRegularError
+	if !errors.As(err, &notRegular) {
+		t.Fatalf("ListFiles() with a FIFO = %v, want NotRegularError", err)
 	}
 	if got, want := notRegular.ID, "pkm-fifo"; got != want {
 		t.Errorf("NotRegularError.ID = %q, want %q", got, want)

@@ -4,20 +4,24 @@
 // coverage and mutation gates.
 //
 // The file policy is written here once, and its central rule is that a
-// symlink inside issues/ is not an Issue:
+// symlink inside issues/ is not an Issue. Symlinks and *.md directories
+// are skipped everywhere — a stray link never fails a listing, an
+// accidental directory never becomes a ghost Issue — so the paths
+// differ only in who errors on a non-regular entry that is not a
+// directory (a FIFO, a device):
 //
-//   - every listing (IDs, List, ListFiles) skips a *.md symlink instead
-//     of failing the whole Vault;
-//   - every targeted operation (Read, Mutate, Edit, Create) refuses one,
-//     so no command reads, writes or edits outside the Vault;
-//   - Create never allocates a name a symlink occupies.
+//   - IDs — the completion path — omits every non-regular entry: it
+//     must never offer a name the commands refuse;
+//   - the sound listing and read paths (List, ListFiles, Read) fail
+//     loud on such an entry, so a broken Vault never passes silently;
+//   - every targeted operation (Read, Mutate, Edit) refuses a symlink,
+//     and Create never allocates a name a symlink occupies, so no
+//     command reads, writes, edits or creates outside the Vault.
 //
-// Everything else about the on-disk shape is preserved: a *.md entry
-// that is a directory is skipped, a non-regular entry that is not a
-// directory (a FIFO, a device) fails loud, an unreadable issues/
-// directory produces a clear error, and Open never loads mt.yaml — the
-// module decides nothing about what a Vault is, it receives the
-// directory.
+// Everything else about the on-disk shape is preserved: an unreadable
+// issues/ directory produces a clear error, and Open never loads
+// mt.yaml — the module decides nothing about what a Vault is, it
+// receives the directory.
 //
 // Errors carry the operation and the ID ("reading issue x: ...") so the
 // command layer can render them as it always has; absence is always a
@@ -116,6 +120,68 @@ func issueID(entry os.DirEntry) (string, bool) {
 		return "", false
 	}
 	return strings.TrimSuffix(name, ".md"), true
+}
+
+// entryKind is what a *.md entry of issues/ is on disk. It comes from
+// the directory listing alone — os.DirEntry.Type resolves the kind
+// without following a symlink — so one ReadDir pass classifies every
+// entry and no path is Lstat'ed for the walk itself.
+type entryKind uint8
+
+const (
+	// kindRegular is a regular file: the only kind that is an Issue.
+	kindRegular entryKind = iota
+	// kindSymlink is a symbolic link: not an Issue anywhere.
+	kindSymlink
+	// kindDirectory is a directory named *.md: not an Issue anywhere.
+	kindDirectory
+	// kindOther is any other non-regular entry (a FIFO, a device): the
+	// sound paths fail loud on it.
+	kindOther
+)
+
+// issueEntry is one *.md entry of the issues/ directory: the ID its
+// file name names and its kind.
+type issueEntry struct {
+	id   string
+	kind entryKind
+}
+
+// scanIssues reads the issues/ directory once and classifies every *.md
+// entry; an entry with another extension is not an Issue and is
+// omitted. It is the Store's only directory walk, and each caller then
+// applies its own policy in terms of the classification: a name that is
+// taken, an ID to list, a file to read.
+func (s Store) scanIssues() ([]issueEntry, error) {
+	entries, err := s.readDir()
+	if err != nil {
+		return nil, err
+	}
+	issues := make([]issueEntry, 0, len(entries))
+	for _, entry := range entries {
+		id, ok := issueID(entry)
+		if !ok {
+			continue
+		}
+		issues = append(issues, issueEntry{id: id, kind: kindOf(entry)})
+	}
+	return issues, nil
+}
+
+// kindOf classifies one directory entry by its kind, never by following
+// a symlink.
+func kindOf(entry os.DirEntry) entryKind {
+	mode := entry.Type()
+	if mode&os.ModeSymlink != 0 {
+		return kindSymlink
+	}
+	if mode.IsDir() {
+		return kindDirectory
+	}
+	if mode.IsRegular() {
+		return kindRegular
+	}
+	return kindOther
 }
 
 // checkRegular validates that the path of id is a regular file without

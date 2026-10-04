@@ -31,9 +31,10 @@ ao mesmo invariante que a borda elimina.
 
 A quebra é **para baixo, não para o lado**. `internal/priority` importa
 `internal/issue` e nada mais do repositório: consome `issue.Item` (a linha
-única com ID + Issue), `issue.Compare` (a regra de Fila) e
-`issue.RenormalizeRanks` (a renormalização 1..N), e o plano que devolve é
-o `issue.Change` do domínio. A projeção some: `Buffer`, `Plan`,
+única com ID + Issue), `issue.Compare` (a regra de Fila) e `issue.Change`
+(o plano que devolve). A renormalização 1..N não passa por ele: quem a
+alcança é o CLI, em `internal/cli/check.go`, chamando
+`issue.RenormalizeRanks(items)`. A projeção some: `Buffer`, `Plan`,
 `QuickPlan`, `Candidates`, `PlacementTarget`, `NewPlace` e `Place` passam a
 receber e devolver `issue.Item`, lendo `Title`, `Status`, `Rank` e
 `CreatedAt` do frontmatter. No CLI, os adaptadores que enfiavam Issues na

@@ -43,9 +43,12 @@ internal/vault/    pure logic: global config (bookmarks + default, XDG, add/
                    plus the ID-prefix step for key commands), @-token
                    extraction, ~ expansion, ID-prefix derivation
 internal/issue/    pure logic: the Issue frontmatter round-trip (stable field
-                   order, optional fields only-when-set, no id/updated_at)
-                   and ID generation (prefix + short random suffix, collision
-                   retry)
+                   order, optional fields only-when-set, no id/updated_at),
+                   ID generation (prefix + short random suffix, collision
+                   retry), and the Fila order rule over the single Item line
+                   — its only home: lower Rank first, Backlog by created_at,
+                   ID as the final tiebreak — plus the Rank renormalization
+                   (1..N) derived from it
 internal/issuefiles/
                    pure logic: the single owner of a Vault's Issue files —
                    listing, reading, writing, editing and creating them.
@@ -54,12 +57,13 @@ internal/issuefiles/
                    read/edit/write/create, never reused as an ID), a *.md
                    directory is skipped, a non-regular entry fails loud,
                    and Open never loads mt.yaml
-internal/list/     pure logic: the queue order (Rank → Backlog by created_at
-                   → ID), visibility filters, glyphs, deferral suffixes,
-                   the computed blocked state and duplicate-rank detection
+internal/list/     pure logic: the list views over the domain's Fila rule —
+                   visibility filters, glyphs, deferral suffixes, the
+                   computed blocked state and duplicate-rank detection
 internal/priority/ pure logic: the queue kernel — the prioritize editor
-                   buffer, quick-order plans and rank renormalization;
-                   deliberately imports no other project package
+                   buffer and the quick-order plans, whose rank shifts are
+                   the domain's issue.Change; depends solely on
+                   internal/issue (the domain base), as ADR-0009 records
 internal/check/    pure logic: the vault audit — frontmatter schema and
                    values, blocked_by integrity, rank gaps and duplicates
 internal/show/     pure logic: the structured show view and its one-line

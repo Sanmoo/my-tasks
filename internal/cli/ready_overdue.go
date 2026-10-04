@@ -8,24 +8,34 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Sanmoo/my-tasks2/internal/exitcode"
-	"github.com/Sanmoo/my-tasks2/internal/issue"
 	"github.com/Sanmoo/my-tasks2/internal/list"
 )
 
-// newReadyCmd builds `mt ready`, which lists open Issues that are
-// available now — not future-deferred and not blocked — in the vault's
-// established priority order.
+// newReadyCmd builds `mt ready`, which lists the Vault's available
+// Issues — list.Available is the single availability predicate, so this
+// command applies no rule of its own — in the vault's established
+// priority order.
 func newReadyCmd() *cobra.Command {
-	return newIssueQueryCmd("ready", "List open Issues available now", func(item issue.Item, now time.Time, statusByID map[string]string) bool {
-		return list.Ready(item, now) && !list.Blocked(item.Issue.Frontmatter.BlockedBy, statusByID)
-	})
+	return &cobra.Command{
+		Use:   "ready",
+		Short: "List open Issues available now",
+		Args: func(_ *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				return exitcode.Usage(fmt.Errorf("ready takes no arguments"))
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runReady(cmd)
+		},
+	}
 }
 
 // newOverdueCmd builds `mt overdue`, the vault's temporal-attention
 // command: expired deferrals first (marked [expirada MM-DD]), then
 // passed deadlines (marked [deadline MM-DD]), each group in the vault's
-// priority order. The two-group output needs its own runner, unlike the
-// single-predicate queries of newIssueQueryCmd.
+// priority order. Temporal attention is not availability (ADR-0006), so
+// the two-group output has its own runner.
 func newOverdueCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "overdue",
@@ -72,29 +82,10 @@ func runOverdue(cmd *cobra.Command) error {
 	return nil
 }
 
-// newIssueQueryCmd builds a read-only query command over a vault's Issues.
-// All queries keep list's priority order and line format, but apply their own
-// eligibility rule. An empty result is a successful, empty output.
-func newIssueQueryCmd(use, short string, matches func(issue.Item, time.Time, map[string]string) bool) *cobra.Command {
-	return &cobra.Command{
-		Use:   use,
-		Short: short,
-		Args: func(_ *cobra.Command, args []string) error {
-			if len(args) > 0 {
-				return exitcode.Usage(fmt.Errorf("%s takes no arguments", use))
-			}
-			return nil
-		},
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runIssueQuery(cmd, matches)
-		},
-	}
-}
-
-// runIssueQuery loads and orders all Issues, then prints those matched by the
-// query. It intentionally does not warn about duplicate ranks: unlike list,
-// these focused views do not serve as vault-integrity reporting.
-func runIssueQuery(cmd *cobra.Command, matches func(issue.Item, time.Time, map[string]string) bool) error {
+// runReady loads and orders all Issues, then prints the available ones.
+// It intentionally does not warn about duplicate ranks: unlike list,
+// this focused view does not serve as vault-integrity reporting.
+func runReady(cmd *cobra.Command) error {
 	vaultDir, err := resolveVault(cmd)
 	if err != nil {
 		return err
@@ -104,12 +95,9 @@ func runIssueQuery(cmd *cobra.Command, matches func(issue.Item, time.Time, map[s
 		return err
 	}
 
-	statusByID := list.StatusByID(items)
-	now := time.Now()
-	for _, item := range items {
-		if matches(item, now, statusByID) {
-			fmt.Fprintln(cmd.OutOrStdout(), formatListLine(item))
-		}
+	out := cmd.OutOrStdout()
+	for _, item := range list.Available(items, time.Now()) {
+		fmt.Fprintln(out, formatListLine(item))
 	}
 	return nil
 }

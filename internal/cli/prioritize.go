@@ -6,6 +6,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -13,6 +14,7 @@ import (
 
 	"github.com/Sanmoo/my-tasks2/internal/exitcode"
 	"github.com/Sanmoo/my-tasks2/internal/issue"
+	"github.com/Sanmoo/my-tasks2/internal/issuefiles"
 	"github.com/Sanmoo/my-tasks2/internal/priority"
 )
 
@@ -146,25 +148,33 @@ func priorityIssuesFromItems(items []issue.Item) []priority.Issue {
 // subprocess per issue.
 func applyRankChanges(vaultDir string, changes []priority.Change) error {
 	for _, ch := range changes {
-		if err := applyRankChange(vaultDir, ch); err != nil {
+		if err := writeRank(vaultDir, ch.ID, ch.Rank); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// applyRankChange writes the new rank (nil = Backlog) into the issue file,
-// preserving everything else.
-func applyRankChange(vaultDir string, ch priority.Change) error {
-	if err := checkID(ch.ID); err != nil {
+// writeRank is the single Rank write path of the CLI: it validates the ID —
+// a malformed ID is a usage error (exit 2), never a write outside the Vault —
+// and persists rank (nil = Backlog) through the store's Mutate door,
+// preserving every other field. mt prioritize, mt check --fix, the quick-order
+// commands (rank/top/bottom/unrank), mt place and create/q's --top/--bottom
+// all funnel through it, so the ID validation cannot be forgotten in one of
+// them. A missing Issue produces the same not-found error the rank paths
+// always produced.
+func writeRank(vaultDir, id string, rank *int) error {
+	if err := checkID(id); err != nil {
 		return err
 	}
-	i, err := readIssue(vaultTarget{dir: vaultDir}, ch.ID)
-	if err != nil {
-		return err
+	_, err := issuefiles.Open(vaultDir).Mutate(id, func(i issue.Issue) (issue.Issue, error) {
+		i.Frontmatter.Rank = rank
+		return i, nil
+	})
+	if errors.Is(err, os.ErrNotExist) {
+		return vaultTarget{dir: vaultDir}.notFoundError(id)
 	}
-	i.Frontmatter.Rank = ch.Rank
-	return writeIssueFile(vaultDir, ch.ID, i)
+	return err
 }
 
 const prioritizeLong = `prioritize opens $EDITOR on a buffer of the vault's open and in_progress

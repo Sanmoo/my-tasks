@@ -72,17 +72,12 @@ func commentText(args []string) (string, error) {
 }
 
 // appendComment loads the Issue for id, appends a timestamped comment with
-// a fresh stable anchor and writes it back.
+// a fresh stable anchor and writes it back through the single mutation path.
 func appendComment(t vaultTarget, id, text string) error {
-	i, err := readIssue(t, id)
-	if err != nil {
-		return err
-	}
-	i, err = addComment(i, text, time.Now().Format(issue.NaiveLayout))
-	if err != nil {
-		return err
-	}
-	return writeIssueFile(t.dir, id, i)
+	_, err := mutateIssue(t, id, func(i issue.Issue) (issue.Issue, error) {
+		return addComment(i, text, time.Now().Format(issue.NaiveLayout))
+	})
+	return err
 }
 
 // addComment returns i with text appended as a new Comment: a heading

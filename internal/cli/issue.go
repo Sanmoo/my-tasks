@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -174,11 +173,7 @@ func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, pl
 	if vcfg.Prefix == "" {
 		return fmt.Errorf("vault %s has no ID prefix in its config — set prefix in mt.yaml", vaultDir)
 	}
-	id, err := newIssueID(vcfg.Prefix, vaultDir)
-	if err != nil {
-		return err
-	}
-	i := issue.Issue{
+	id, err := issuefiles.Open(vaultDir).Create(vcfg.Prefix, issue.Issue{
 		Frontmatter: issue.Frontmatter{
 			Title:     title,
 			Status:    "open",
@@ -186,32 +181,31 @@ func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, pl
 			CreatedAt: time.Now().Format(issue.NaiveLayout),
 		},
 		Body: issue.DefaultBody,
-	}
-	if placement != nil {
-		rank, others, err := planCreatePlacement(vaultDir, priorityIssueFrom(id, i), *placement)
-		if err != nil {
-			return err
-		}
-		// Rewrite the displaced Issues before the new file lands, so the
-		// rank the new Issue takes (e.g. 1) is never duplicated on disk
-		// by the Issue it displaces.
-		if err := applyRankChanges(vaultDir, others); err != nil {
-			return err
-		}
-		i.Frontmatter.Rank = &rank
-	}
-	data, err := issue.Render(i)
+	}, rand.Reader)
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(issuePath(vaultDir, id), data, 0o644); err != nil {
-		return fmt.Errorf("writing issue %s: %w", id, err)
+	rank := 0
+	if placement != nil {
+		var others []priority.Change
+		rank, others, err = planCreatePlacement(vaultDir, id, *placement)
+		if err != nil {
+			return err
+		}
+		// Rewrite the displaced Issues before the new Issue receives its
+		// rank, so the rank it takes (e.g. 1) is never duplicated on disk.
+		if err := applyRankChanges(vaultDir, others); err != nil {
+			return err
+		}
+		if err := writeRank(vaultDir, id, &rank); err != nil {
+			return err
+		}
 	}
 	switch {
 	case quiet:
 		fmt.Fprintln(cmd.OutOrStdout(), id)
 	case placement != nil:
-		fmt.Fprintf(cmd.OutOrStdout(), "Created %s (rank %d)\n", id, *i.Frontmatter.Rank)
+		fmt.Fprintf(cmd.OutOrStdout(), "Created %s (rank %d)\n", id, rank)
 	default:
 		fmt.Fprintf(cmd.OutOrStdout(), "Created %s\n", id)
 	}
@@ -226,30 +220,32 @@ func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, pl
 
 // planCreatePlacement computes where a new Issue enters the queue when
 // created with --top/--bottom: it reuses the quick-order plan (the same
-// single source of truth as `mt top`/`mt bottom`) by planning the new
-// Issue as if it already existed unranked next to the vault's Issues.
-// It returns the new Issue's rank and the rank changes of the Issues it
-// displaces; the new Issue's own file is written by the caller.
-func planCreatePlacement(vaultDir string, newIssue priority.Issue, action priority.QuickAction) (int, []priority.Change, error) {
+// single source of truth as `mt top`/`mt bottom`) over the Vault as it is
+// now — the new Issue included, unranked, since the store's Create already
+// wrote it. It returns the new Issue's rank and the rank changes of the
+// Issues it displaces; the caller applies the displaced changes first and
+// the new Issue's rank last, so the rank it takes is never duplicated on
+// disk.
+func planCreatePlacement(vaultDir, id string, action priority.QuickAction) (int, []priority.Change, error) {
 	issues, err := loadPriorityIssues(vaultDir)
 	if err != nil {
 		return 0, nil, err
 	}
-	changes, err := priority.QuickPlan(append(issues, newIssue), newIssue.ID, action, 0)
+	changes, err := priority.QuickPlan(issues, id, action, 0)
 	if err != nil {
 		return 0, nil, err
 	}
 	rank, others := 0, make([]priority.Change, 0, len(changes))
 	found := false
 	for _, ch := range changes {
-		if ch.ID == newIssue.ID && ch.Rank != nil {
+		if ch.ID == id && ch.Rank != nil {
 			rank, found = *ch.Rank, true
 			continue
 		}
 		others = append(others, ch)
 	}
 	if !found {
-		return 0, nil, fmt.Errorf("planning the queue placement of %s: no rank was planned", newIssue.ID)
+		return 0, nil, fmt.Errorf("planning the queue placement of %s: no rank was planned", id)
 	}
 	return rank, others, nil
 }
@@ -339,14 +335,13 @@ func newEditCmd() *cobra.Command {
 			if err := checkID(args[0]); err != nil {
 				return err
 			}
-			path := issuePath(t.dir, args[0])
-			if _, err := os.Stat(path); err != nil {
-				if os.IsNotExist(err) {
+			if err := issuefiles.Open(t.dir).Edit(args[0], editFile); err != nil {
+				if errors.Is(err, os.ErrNotExist) {
 					return t.notFoundError(args[0])
 				}
-				return fmt.Errorf("checking issue %s: %w", args[0], err)
+				return err
 			}
-			return editFile(path)
+			return nil
 		},
 	}
 }
@@ -360,11 +355,6 @@ func termWidth() int {
 	return w
 }
 
-// issuePath returns the Issue file path for an ID inside a vault.
-func issuePath(vaultDir, id string) string {
-	return filepath.Join(vaultDir, "issues", id+".md")
-}
-
 // checkID guards against an ID that would escape the issues directory.
 // The rule itself is issue.ValidID — the same single-component predicate
 // the file layer applies — so the CLI and any store cannot disagree; a
@@ -375,20 +365,6 @@ func checkID(id string) error {
 		return exitcode.Usage(fmt.Errorf("invalid issue ID %q", id))
 	}
 	return nil
-}
-
-// newIssueID allocates an ID for a new Issue: the vault prefix plus a
-// random suffix that does not collide with any existing issue file.
-func newIssueID(prefix, vaultDir string) (string, error) {
-	ids, err := issueIDs(vaultDir)
-	if err != nil {
-		return "", err
-	}
-	taken := make(map[string]bool, len(ids))
-	for _, id := range ids {
-		taken[id] = true
-	}
-	return issue.NextID(prefix, taken, rand.Reader)
 }
 
 // editFile opens path in the user's $EDITOR and waits for it to finish.

@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Sanmoo/my-tasks2/internal/exitcode"
+	"github.com/Sanmoo/my-tasks2/internal/issue"
 	"github.com/Sanmoo/my-tasks2/internal/list"
 )
 
@@ -89,7 +90,7 @@ func runList(cmd *cobra.Command, all bool, statusFilter string, labelFilters []s
 
 // loadSortedItems reads every Issue in the vault and orders the result
 // according to the shared list order.
-func loadSortedItems(vaultDir string) ([]list.Item, error) {
+func loadSortedItems(vaultDir string) ([]issue.Item, error) {
 	items, err := loadItems(vaultDir)
 	if err != nil {
 		return nil, err
@@ -100,21 +101,21 @@ func loadSortedItems(vaultDir string) ([]list.Item, error) {
 
 // formatListLine renders the standard one-line Issue representation used by
 // list and its focused query views.
-func formatListLine(it list.Item) string {
+func formatListLine(it issue.Item) string {
 	return list.FormatLine(it)
 }
 
 // loadItems reads every *.md file in the vault's issues/ directory and
 // parses it into a list item. The file name (minus .md) is the ID; a
 // malformed file fails the whole list with the offending ID named.
-func loadItems(vaultDir string) ([]list.Item, error) {
+func loadItems(vaultDir string) ([]issue.Item, error) {
 	files, err := readIssueFiles(vaultDir)
 	if err != nil {
 		return nil, err
 	}
-	items := make([]list.Item, 0, len(files))
+	items := make([]issue.Item, 0, len(files))
 	for _, file := range files {
-		items = append(items, list.Item{ID: file.ID, Issue: file.Issue})
+		items = append(items, issue.Item{ID: file.ID, Issue: file.Issue})
 	}
 	return items, nil
 }

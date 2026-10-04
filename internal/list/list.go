@@ -20,13 +20,6 @@ import (
 	"github.com/Sanmoo/my-tasks2/internal/issue"
 )
 
-// Item is one Issue in a list view: the file name ID (the authority,
-// no id field in the frontmatter) plus the parsed Issue.
-type Item struct {
-	ID    string
-	Issue issue.Issue
-}
-
 // glyphs maps the three built-in statuses to their list glyph. Any
 // other (custom) status falls back to a distinct marker.
 const (
@@ -57,7 +50,7 @@ func Glyph(status string) string {
 // compared as a string, which equals chronological order for the
 // canonical zero-padded, fixed-width stamp (issue.NaiveLayout); a
 // hand-edited stamp that drifts from that layout is mt check's to flag.
-func Compare(a, b Item) int {
+func Compare(a, b issue.Item) int {
 	ar, br := a.Issue.Frontmatter.Rank, b.Issue.Frontmatter.Rank
 	if ar != nil && br != nil {
 		if c := cmp.Compare(*ar, *br); c != 0 {
@@ -85,7 +78,7 @@ func Compare(a, b Item) int {
 func compareID(a, b string) int { return cmp.Compare(a, b) }
 
 // Sort orders items in place by Compare.
-func Sort(items []Item) {
+func Sort(items []issue.Item) {
 	sort.SliceStable(items, func(i, j int) bool {
 		return Compare(items[i], items[j]) < 0
 	})
@@ -115,14 +108,14 @@ func IsFutureDeferred(deferredUntil string, now time.Time) bool {
 // that mean "available" combine both. An empty or malformed
 // deferred_until does not prevent availability; mt check owns
 // validation of persisted datetime fields.
-func Ready(item Item, now time.Time) bool {
+func Ready(item issue.Item, now time.Time) bool {
 	return item.Issue.Frontmatter.Status == "open" && !IsFutureDeferred(item.Issue.Frontmatter.DeferredUntil, now)
 }
 
 // Overdue reports whether item has a Deadline before now and is not done.
 // Deadline is informational, so a future deferral does not affect this result.
 // An empty or malformed deadline is not overdue; mt check owns validation.
-func Overdue(item Item, now time.Time) bool {
+func Overdue(item issue.Item, now time.Time) bool {
 	deadline, ok := parseNaive(item.Issue.Frontmatter.Deadline)
 	return ok && deadline.Before(now) && item.Issue.Frontmatter.Status != "done"
 }
@@ -161,10 +154,10 @@ func DeadlineSuffix(deadline string, now time.Time) string {
 
 // OverdueGroups partitions items into the two groups of the overdue
 // temporal-attention view: items whose deferral has expired first, then
-// items whose deadline has passed. Only non-done Items participate; an
-// Item with both signals appears once, in the expired group. The input
+// items whose deadline has passed. Only non-done Issues participate; an
+// Issue with both signals appears once, in the expired group. The input
 // order (the vault's Rank order) is preserved within each group.
-func OverdueGroups(items []Item, now time.Time) (expired, late []Item) {
+func OverdueGroups(items []issue.Item, now time.Time) (expired, late []issue.Item) {
 	for _, it := range items {
 		if it.Issue.Frontmatter.Status == "done" {
 			continue
@@ -194,7 +187,7 @@ func DeferSuffix(deferredUntil string, now time.Time) string {
 // StatusByID indexes items by their ID for the blocked lookup: the map
 // holds each item's status, and an ID with no issue is absent. The
 // caller builds it once per vault view and passes it to Blocked.
-func StatusByID(items []Item) map[string]string {
+func StatusByID(items []issue.Item) map[string]string {
 	byID := make(map[string]string, len(items))
 	for _, item := range items {
 		byID[item.ID] = item.Issue.Frontmatter.Status
@@ -218,7 +211,7 @@ func Blocked(blockedBy []string, statusByID map[string]string) bool {
 
 // FormatLine renders the standard one-line Issue representation used by
 // list and focused single-Issue views.
-func FormatLine(item Item) string {
+func FormatLine(item issue.Item) string {
 	fm := item.Issue.Frontmatter
 	return fmt.Sprintf("%s %s  %s", Glyph(fm.Status), item.ID, fm.Title)
 }
@@ -245,7 +238,7 @@ type Options struct {
 // them; a future deferral does not hide an issue (the [defer ...]
 // suffix signals its unavailability); opts.Labels narrow the view to
 // issues carrying at least one of the labels.
-func Visible(item Item, opts Options) bool {
+func Visible(item issue.Item, opts Options) bool {
 	fm := item.Issue.Frontmatter
 	if opts.Status != "" {
 		if fm.Status != opts.Status {
@@ -266,13 +259,13 @@ func Visible(item Item, opts Options) bool {
 // Future-deferred and blocked Issues are unavailable, while a deferred_until
 // exactly at now is available. Duplicate ranks anywhere in the vault are rejected
 // before candidate selection, including ranks on non-open Issues.
-func PickNext(items []Item, now time.Time) (Item, error) {
+func PickNext(items []issue.Item, now time.Time) (issue.Item, error) {
 	if dups := DuplicateRanks(items); len(dups) > 0 {
-		return Item{}, fmt.Errorf("duplicate rank: %d", dups[0])
+		return issue.Item{}, fmt.Errorf("duplicate rank: %d", dups[0])
 	}
 
 	statusByID := StatusByID(items)
-	candidates := make([]Item, 0, len(items))
+	candidates := make([]issue.Item, 0, len(items))
 	for _, item := range items {
 		if item.Issue.Frontmatter.Status != "open" {
 			continue
@@ -286,7 +279,7 @@ func PickNext(items []Item, now time.Time) (Item, error) {
 		candidates = append(candidates, item)
 	}
 	if len(candidates) == 0 {
-		return Item{}, errors.New("no available open issues")
+		return issue.Item{}, errors.New("no available open issues")
 	}
 	Sort(candidates)
 	return candidates[0], nil
@@ -305,7 +298,7 @@ func hasAnyLabel(labels, filters []string) bool {
 // DuplicateRanks returns the rank values that appear in more than one
 // ranked item, sorted ascending. A nil rank (Backlog) is not a rank
 // value and never counts as a duplicate.
-func DuplicateRanks(items []Item) []int {
+func DuplicateRanks(items []issue.Item) []int {
 	counts := make(map[int]int)
 	for _, it := range items {
 		if r := it.Issue.Frontmatter.Rank; r != nil {

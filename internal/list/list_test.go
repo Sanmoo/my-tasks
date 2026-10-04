@@ -15,8 +15,8 @@ import (
 
 func intPtr(v int) *int { return &v }
 
-func item(id, status string, rank *int, createdAt, deferredUntil string) list.Item {
-	return list.Item{
+func item(id, status string, rank *int, createdAt, deferredUntil string) issue.Item {
+	return issue.Item{
 		ID: id,
 		Issue: issue.Issue{
 			Frontmatter: issue.Frontmatter{
@@ -31,8 +31,8 @@ func item(id, status string, rank *int, createdAt, deferredUntil string) list.It
 
 // labeled builds an item with labels (and a canonical created_at) for
 // the visibility tests.
-func labeled(id, status string, labels []string, deferredUntil string) list.Item {
-	return list.Item{
+func labeled(id, status string, labels []string, deferredUntil string) issue.Item {
+	return issue.Item{
 		ID: id,
 		Issue: issue.Issue{
 			Frontmatter: issue.Frontmatter{
@@ -45,7 +45,7 @@ func labeled(id, status string, labels []string, deferredUntil string) list.Item
 	}
 }
 
-func ids(items []list.Item) []string {
+func ids(items []issue.Item) []string {
 	out := make([]string, len(items))
 	for i, it := range items {
 		out[i] = it.ID
@@ -58,7 +58,7 @@ func TestCompare(t *testing.T) {
 	rank2 := intPtr(2)
 	cases := []struct {
 		name string
-		a, b list.Item
+		a, b issue.Item
 		want int
 	}{
 		{"lower rank first", item("a", "open", rank1, "", ""), item("b", "open", rank2, "", ""), -1},
@@ -83,7 +83,7 @@ func TestCompare(t *testing.T) {
 
 func TestSortOrdersByRankThenBacklogCreatedAtThenID(t *testing.T) {
 	r1, r2 := intPtr(1), intPtr(2)
-	items := []list.Item{
+	items := []issue.Item{
 		item("pkm-003", "open", nil, "2026-08-16T09:30", ""),
 		item("pkm-002", "open", r2, "", ""),
 		item("pkm-004", "open", nil, "2026-08-15T09:30", ""),
@@ -98,7 +98,7 @@ func TestSortOrdersByRankThenBacklogCreatedAtThenID(t *testing.T) {
 
 func TestSortDoesNotReorderAnEmptyOrSingleList(t *testing.T) {
 	list.Sort(nil)
-	single := []list.Item{item("pkm-001", "open", intPtr(1), "", "")}
+	single := []issue.Item{item("pkm-001", "open", intPtr(1), "", "")}
 	list.Sort(single)
 	if got := ids(single); !slices.Equal(got, []string{"pkm-001"}) {
 		t.Errorf("Sort(single) = %v, want unchanged", got)
@@ -109,8 +109,8 @@ func TestSortIsStableForItemsThatCompareEqual(t *testing.T) {
 	// Two items that Compare equal (same rank, created_at and ID) must
 	// keep their relative order under a stable sort. Their titles differ
 	// so the test can tell them apart.
-	mk := func(title string) list.Item {
-		return list.Item{
+	mk := func(title string) issue.Item {
+		return issue.Item{
 			ID: "same-id",
 			Issue: issue.Issue{
 				Frontmatter: issue.Frontmatter{
@@ -121,7 +121,7 @@ func TestSortIsStableForItemsThatCompareEqual(t *testing.T) {
 			},
 		}
 	}
-	items := []list.Item{mk("first"), mk("second")}
+	items := []issue.Item{mk("first"), mk("second")}
 	list.Sort(items)
 	if items[0].Issue.Frontmatter.Title != "first" || items[1].Issue.Frontmatter.Title != "second" {
 		t.Errorf("Sort reordered equal items: %q, %q", items[0].Issue.Frontmatter.Title, items[1].Issue.Frontmatter.Title)
@@ -175,7 +175,7 @@ func TestReady(t *testing.T) {
 	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
 	cases := []struct {
 		name string
-		it   list.Item
+		it   issue.Item
 		want bool
 	}{
 		{"open without deferral is ready", item("open", "open", nil, "", ""), true},
@@ -196,14 +196,14 @@ func TestReady(t *testing.T) {
 
 func TestOverdue(t *testing.T) {
 	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
-	withDeadline := func(status, deadline string) list.Item {
+	withDeadline := func(status, deadline string) issue.Item {
 		it := item("issue", status, nil, "", "")
 		it.Issue.Frontmatter.Deadline = deadline
 		return it
 	}
 	cases := []struct {
 		name string
-		it   list.Item
+		it   issue.Item
 		want bool
 	}{
 		{"past deadline is overdue", withDeadline("open", "2026-08-10T08:00"), true},
@@ -212,7 +212,7 @@ func TestOverdue(t *testing.T) {
 		{"missing deadline is not overdue", withDeadline("open", ""), false},
 		{"malformed deadline is not overdue", withDeadline("open", "not-a-date"), false},
 		{"done issue is not overdue", withDeadline("done", "2026-08-10T08:00"), false},
-		{"deferred issue can be overdue", func() list.Item {
+		{"deferred issue can be overdue", func() issue.Item {
 			it := withDeadline("open", "2026-08-10T08:00")
 			it.Issue.Frontmatter.DeferredUntil = "2026-08-20T08:00"
 			return it
@@ -320,7 +320,7 @@ func TestDeadlineSuffix(t *testing.T) {
 
 // overdueItem builds an item with a deadline and an optional
 // deferred_until, for the OverdueGroups tests.
-func overdueItem(id, status, deadline, deferredUntil string) list.Item {
+func overdueItem(id, status, deadline, deferredUntil string) issue.Item {
 	it := item(id, status, nil, "", deferredUntil)
 	it.Issue.Frontmatter.Deadline = deadline
 	return it
@@ -332,7 +332,7 @@ func TestOverdueGroups(t *testing.T) {
 	future := "2026-08-20T08:00"
 
 	t.Run("partitions expired deferrals and passed deadlines", func(t *testing.T) {
-		items := []list.Item{
+		items := []issue.Item{
 			overdueItem("late", "open", expired, ""),
 			overdueItem("expired", "open", "", expired),
 			overdueItem("quiet", "open", "", ""),
@@ -347,7 +347,7 @@ func TestOverdueGroups(t *testing.T) {
 	})
 
 	t.Run("both signals appear once in the expired group", func(t *testing.T) {
-		items := []list.Item{
+		items := []issue.Item{
 			overdueItem("both", "open", expired, expired),
 		}
 		exp, late := list.OverdueGroups(items, now)
@@ -360,7 +360,7 @@ func TestOverdueGroups(t *testing.T) {
 	})
 
 	t.Run("done is excluded from both groups", func(t *testing.T) {
-		items := []list.Item{
+		items := []issue.Item{
 			overdueItem("done", "done", expired, expired),
 			overdueItem("open", "open", expired, ""),
 		}
@@ -374,7 +374,7 @@ func TestOverdueGroups(t *testing.T) {
 	})
 
 	t.Run("in_progress participates", func(t *testing.T) {
-		items := []list.Item{
+		items := []issue.Item{
 			overdueItem("progress", "in_progress", "", expired),
 		}
 		exp, late := list.OverdueGroups(items, now)
@@ -387,7 +387,7 @@ func TestOverdueGroups(t *testing.T) {
 	})
 
 	t.Run("preserves input order within each group", func(t *testing.T) {
-		items := []list.Item{
+		items := []issue.Item{
 			overdueItem("late-2", "open", expired, ""),
 			overdueItem("expired-2", "open", "", expired),
 			overdueItem("late-1", "open", expired, ""),
@@ -410,7 +410,7 @@ func TestOverdueGroups(t *testing.T) {
 	})
 
 	t.Run("future deferral with passed deadline is late", func(t *testing.T) {
-		items := []list.Item{
+		items := []issue.Item{
 			overdueItem("later", "open", expired, future),
 		}
 		exp, late := list.OverdueGroups(items, now)
@@ -423,7 +423,7 @@ func TestOverdueGroups(t *testing.T) {
 	})
 
 	t.Run("malformed values participate in no group", func(t *testing.T) {
-		items := []list.Item{
+		items := []issue.Item{
 			overdueItem("bad", "open", "garbage", "garbage"),
 		}
 		exp, late := list.OverdueGroups(items, now)
@@ -444,7 +444,7 @@ func TestVisible(t *testing.T) {
 
 	cases := []struct {
 		name string
-		it   list.Item
+		it   issue.Item
 		opts list.Options
 		want bool
 	}{
@@ -478,7 +478,7 @@ func TestVisible(t *testing.T) {
 
 func TestPickNextChoosesLowestRankedAvailableOpenIssue(t *testing.T) {
 	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
-	items := []list.Item{
+	items := []issue.Item{
 		item("backlog-old", "open", nil, "2020-01-01T10:00", ""),
 		item("rank-two", "open", intPtr(2), "2026-08-14T10:00", ""),
 		item("rank-one", "open", intPtr(1), "2026-08-15T10:00", ""),
@@ -498,7 +498,7 @@ func TestPickNextChoosesLowestRankedAvailableOpenIssue(t *testing.T) {
 
 func TestPickNextUsesAvailableBacklogWhenNoRankedCandidate(t *testing.T) {
 	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
-	items := []list.Item{
+	items := []issue.Item{
 		item("future-old", "open", nil, "2020-01-01T10:00", "2026-08-20T08:00"),
 		item("backlog-newer", "open", nil, "2026-08-16T10:00", ""),
 		item("backlog-id-b", "open", nil, "2026-08-15T10:00", ""),
@@ -516,7 +516,7 @@ func TestPickNextUsesAvailableBacklogWhenNoRankedCandidate(t *testing.T) {
 
 func TestPickNextTreatsDeferredUntilNowAsAvailable(t *testing.T) {
 	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
-	items := []list.Item{
+	items := []issue.Item{
 		item("at-now", "open", intPtr(1), "2026-08-15T10:00", "2026-08-15T12:00"),
 	}
 
@@ -530,7 +530,7 @@ func TestPickNextTreatsDeferredUntilNowAsAvailable(t *testing.T) {
 }
 
 func TestStatusByID(t *testing.T) {
-	items := []list.Item{
+	items := []issue.Item{
 		item("a", "open", nil, "", ""),
 		item("b", "in_progress", nil, "", ""),
 		item("c", "done", nil, "", ""),
@@ -542,14 +542,14 @@ func TestStatusByID(t *testing.T) {
 }
 
 // blockedByItem builds an item that lists blockers in blocked_by.
-func blockedByItem(id, status string, blockedBy []string) list.Item {
+func blockedByItem(id, status string, blockedBy []string) issue.Item {
 	it := item(id, status, nil, "", "")
 	it.Issue.Frontmatter.BlockedBy = blockedBy
 	return it
 }
 
 func TestBlocked(t *testing.T) {
-	byID := list.StatusByID([]list.Item{
+	byID := list.StatusByID([]issue.Item{
 		item("done", "done", nil, "", ""),
 		item("open", "open", nil, "", ""),
 		item("progress", "in_progress", nil, "", ""),
@@ -577,7 +577,7 @@ func TestBlocked(t *testing.T) {
 
 func TestPickNextSkipsBlockedIssues(t *testing.T) {
 	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
-	items := []list.Item{
+	items := []issue.Item{
 		blockedByItem("blocked-rank-one", "open", []string{"open-blocker"}),
 		blockedByItem("open-blocker", "open", nil),
 		blockedByItem("blocked-by-done", "open", []string{"done-blocker"}),
@@ -599,7 +599,7 @@ func TestPickNextSkipsBlockedIssues(t *testing.T) {
 
 func TestPickNextRejectsWhenEverythingIsBlocked(t *testing.T) {
 	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
-	items := []list.Item{
+	items := []issue.Item{
 		blockedByItem("a", "open", []string{"b"}),
 		blockedByItem("b", "in_progress", nil),
 	}
@@ -611,7 +611,7 @@ func TestPickNextRejectsWhenEverythingIsBlocked(t *testing.T) {
 
 func TestPickNextDoesNotReorderInput(t *testing.T) {
 	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
-	items := []list.Item{
+	items := []issue.Item{
 		item("backlog", "open", nil, "2026-08-16T10:00", ""),
 		item("ranked", "open", intPtr(1), "2026-08-15T10:00", ""),
 	}
@@ -626,7 +626,7 @@ func TestPickNextDoesNotReorderInput(t *testing.T) {
 
 func TestPickNextRejectsDuplicateRanks(t *testing.T) {
 	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
-	items := []list.Item{
+	items := []issue.Item{
 		item("open", "open", intPtr(1), "2026-08-15T10:00", ""),
 		item("in-progress", "in_progress", intPtr(1), "2026-08-15T11:00", ""),
 	}
@@ -640,14 +640,14 @@ func TestPickNextRejectsWhenNothingIsAvailable(t *testing.T) {
 	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.Local)
 	cases := []struct {
 		name  string
-		items []list.Item
+		items []issue.Item
 	}{
 		{name: "empty vault"},
-		{name: "no open issues", items: []list.Item{
+		{name: "no open issues", items: []issue.Item{
 			item("progress", "in_progress", nil, "2026-08-15T10:00", ""),
 			item("done", "done", nil, "2026-08-15T11:00", ""),
 		}},
-		{name: "all open issues deferred", items: []list.Item{
+		{name: "all open issues deferred", items: []issue.Item{
 			item("future", "open", nil, "2026-08-15T10:00", "2026-08-20T08:00"),
 		}},
 	}
@@ -662,7 +662,7 @@ func TestPickNextRejectsWhenNothingIsAvailable(t *testing.T) {
 
 func TestDuplicateRanks(t *testing.T) {
 	t.Run("no duplicates", func(t *testing.T) {
-		got := list.DuplicateRanks([]list.Item{
+		got := list.DuplicateRanks([]issue.Item{
 			item("a", "open", intPtr(1), "", ""),
 			item("b", "open", intPtr(2), "", ""),
 			item("c", "open", nil, "", ""),
@@ -673,7 +673,7 @@ func TestDuplicateRanks(t *testing.T) {
 	})
 
 	t.Run("nil rank is never a duplicate", func(t *testing.T) {
-		got := list.DuplicateRanks([]list.Item{
+		got := list.DuplicateRanks([]issue.Item{
 			item("a", "open", nil, "", ""),
 			item("b", "open", nil, "", ""),
 			item("c", "open", nil, "", ""),
@@ -684,7 +684,7 @@ func TestDuplicateRanks(t *testing.T) {
 	})
 
 	t.Run("multiple duplicates sorted ascending", func(t *testing.T) {
-		got := list.DuplicateRanks([]list.Item{
+		got := list.DuplicateRanks([]issue.Item{
 			item("a", "open", intPtr(3), "", ""),
 			item("b", "open", intPtr(1), "", ""),
 			item("c", "open", nil, "", ""),
@@ -694,6 +694,12 @@ func TestDuplicateRanks(t *testing.T) {
 		want := []int{1, 3}
 		if !slices.Equal(got, want) {
 			t.Errorf("DuplicateRanks = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("nil input has no duplicates", func(t *testing.T) {
+		if got := list.DuplicateRanks(nil); len(got) != 0 {
+			t.Errorf("DuplicateRanks(nil) = %v, want empty", got)
 		}
 	})
 }

@@ -9,6 +9,8 @@ import (
 
 	"github.com/Sanmoo/my-tasks2/internal/check"
 	"github.com/Sanmoo/my-tasks2/internal/exitcode"
+	"github.com/Sanmoo/my-tasks2/internal/issue"
+	"github.com/Sanmoo/my-tasks2/internal/list"
 	"github.com/Sanmoo/my-tasks2/internal/priority"
 	"github.com/Sanmoo/my-tasks2/internal/vault"
 )
@@ -76,29 +78,29 @@ func runCheck(cmd *cobra.Command, fix bool) error {
 	if gaps := check.RankGapRanges(items); len(gaps) > 0 {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: rank gap: %s\n", formatRankGaps(gaps))
 	}
-	if dups := check.DuplicateRanks(items); len(dups) > 0 {
+	if dups := list.DuplicateRanks(items); len(dups) > 0 {
 		return fmt.Errorf("duplicate rank: %s", duplicateRankDetails(items, dups))
 	}
 	fmt.Fprintln(cmd.OutOrStdout(), "OK")
 	return nil
 }
 
-func loadCheckItems(vaultDir string) ([]check.Item, error) {
+func loadCheckItems(vaultDir string) ([]issue.Item, error) {
 	files, err := readIssueFiles(vaultDir)
 	if err != nil {
 		return nil, fmt.Errorf("malformed frontmatter: %w", err)
 	}
-	items := make([]check.Item, 0, len(files))
+	items := make([]issue.Item, 0, len(files))
 	for _, file := range files {
 		if err := check.ValidateFrontmatter(file.Data, file.ID); err != nil {
 			return nil, err
 		}
-		items = append(items, check.Item{ID: file.ID, Issue: file.Issue})
+		items = append(items, issue.Item{ID: file.ID, Issue: file.Issue})
 	}
 	return items, nil
 }
 
-func duplicateRankDetails(items []check.Item, ranks []int) string {
+func duplicateRankDetails(items []issue.Item, ranks []int) string {
 	byRank := make(map[int][]string)
 	for _, item := range items {
 		if item.Issue.Frontmatter.Rank != nil {
@@ -112,7 +114,7 @@ func duplicateRankDetails(items []check.Item, ranks []int) string {
 	return strings.Join(details, "; ")
 }
 
-func priorityIssuesFromCheckItems(items []check.Item) []priority.Issue {
+func priorityIssuesFromCheckItems(items []issue.Item) []priority.Issue {
 	issues := make([]priority.Issue, 0, len(items))
 	for _, item := range items {
 		issues = append(issues, priorityIssueFrom(item.ID, item.Issue))
@@ -133,7 +135,7 @@ func applyCheckRankChange(vaultDir string, change priority.Change) error {
 // status, datetime layout) and the vault-wide blocked_by reference
 // checks (existence, self-block, cycles). It returns the first
 // violation found.
-func validateVault(vcfg vault.Vault, items []check.Item) error {
+func validateVault(vcfg vault.Vault, items []issue.Item) error {
 	statuses := vcfg.StatusList()
 	for _, item := range items {
 		if err := check.ValidateItem(item, statuses); err != nil {

@@ -10,8 +10,8 @@ import (
 
 func intPtr(value int) *int { return &value }
 
-func item(id, status string, rank *int, createdAt string) check.Item {
-	return check.Item{
+func item(id, status string, rank *int, createdAt string) issue.Item {
+	return issue.Item{
 		ID: id,
 		Issue: issue.Issue{Frontmatter: issue.Frontmatter{
 			Title:     "title",
@@ -27,17 +27,17 @@ func TestRankGapRanges(t *testing.T) {
 	maxInt := int(^uint(0) >> 1)
 	tests := []struct {
 		name  string
-		items []check.Item
+		items []issue.Item
 		want  []check.RankGap
 	}{
 		{"empty", nil, nil},
-		{"contiguous", []check.Item{item("a", "open", intPtr(1), ""), item("b", "open", intPtr(2), "")}, nil},
-		{"missing first", []check.Item{item("b", "open", intPtr(2), "")}, []check.RankGap{{Start: 1, End: 1}}},
-		{"missing middle", []check.Item{item("a", "open", intPtr(1), ""), item("c", "open", intPtr(3), "")}, []check.RankGap{{Start: 2, End: 2}}},
-		{"multiple ranges", []check.Item{item("a", "open", intPtr(1), ""), item("c", "open", intPtr(3), ""), item("e", "open", intPtr(5), "")}, []check.RankGap{{Start: 2, End: 2}, {Start: 4, End: 4}}},
-		{"duplicate and backlog", []check.Item{item("a", "open", intPtr(1), ""), item("b", "open", intPtr(1), ""), item("c", "open", nil, "")}, nil},
-		{"non-positive values ignored", []check.Item{item("a", "open", intPtr(-1), ""), item("b", "open", intPtr(0), ""), item("c", "open", intPtr(1), "")}, nil},
-		{"huge range stays compact", []check.Item{item("a", "open", intPtr(1), ""), item("z", "open", &maxInt, "")}, []check.RankGap{{Start: 2, End: maxInt - 1}}},
+		{"contiguous", []issue.Item{item("a", "open", intPtr(1), ""), item("b", "open", intPtr(2), "")}, nil},
+		{"missing first", []issue.Item{item("b", "open", intPtr(2), "")}, []check.RankGap{{Start: 1, End: 1}}},
+		{"missing middle", []issue.Item{item("a", "open", intPtr(1), ""), item("c", "open", intPtr(3), "")}, []check.RankGap{{Start: 2, End: 2}}},
+		{"multiple ranges", []issue.Item{item("a", "open", intPtr(1), ""), item("c", "open", intPtr(3), ""), item("e", "open", intPtr(5), "")}, []check.RankGap{{Start: 2, End: 2}, {Start: 4, End: 4}}},
+		{"duplicate and backlog", []issue.Item{item("a", "open", intPtr(1), ""), item("b", "open", intPtr(1), ""), item("c", "open", nil, "")}, nil},
+		{"non-positive values ignored", []issue.Item{item("a", "open", intPtr(-1), ""), item("b", "open", intPtr(0), ""), item("c", "open", intPtr(1), "")}, nil},
+		{"huge range stays compact", []issue.Item{item("a", "open", intPtr(1), ""), item("z", "open", &maxInt, "")}, []check.RankGap{{Start: 2, End: maxInt - 1}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -55,7 +55,7 @@ func TestRankGapRanges(t *testing.T) {
 }
 
 func TestNonPositiveRanks(t *testing.T) {
-	items := []check.Item{
+	items := []issue.Item{
 		item("zero", "open", intPtr(0), ""),
 		item("negative", "open", intPtr(-1), ""),
 		item("zero-again", "open", intPtr(0), ""),
@@ -68,24 +68,6 @@ func TestNonPositiveRanks(t *testing.T) {
 	}
 	if got := check.NonPositiveRanks(nil); len(got) != 0 {
 		t.Errorf("NonPositiveRanks(nil) = %v, want empty", got)
-	}
-}
-
-func TestDuplicateRanks(t *testing.T) {
-	items := []check.Item{
-		item("r3a", "open", intPtr(3), ""),
-		item("r1a", "open", intPtr(1), ""),
-		item("backlog", "open", nil, ""),
-		item("r1b", "open", intPtr(1), ""),
-		item("r3b", "open", intPtr(3), ""),
-	}
-	got := check.DuplicateRanks(items)
-	want := []int{1, 3}
-	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
-		t.Errorf("DuplicateRanks() = %v, want %v", got, want)
-	}
-	if got := check.DuplicateRanks(nil); len(got) != 0 {
-		t.Errorf("DuplicateRanks(nil) = %v, want empty", got)
 	}
 }
 
@@ -142,19 +124,19 @@ func TestValidateItem(t *testing.T) {
 
 	tests := []struct {
 		name string
-		item check.Item
+		item issue.Item
 		want string
 	}{
-		{"missing title", func() check.Item { x := base; x.Issue.Frontmatter.Title = ""; return x }(), "missing title"},
-		{"missing status", func() check.Item { x := base; x.Issue.Frontmatter.Status = ""; return x }(), "missing status"},
-		{"missing labels", func() check.Item { x := base; x.Issue.Frontmatter.Labels = nil; return x }(), "missing labels"},
-		{"missing created_at", func() check.Item { x := base; x.Issue.Frontmatter.CreatedAt = ""; return x }(), "missing created_at"},
-		{"invalid status", func() check.Item { x := base; x.Issue.Frontmatter.Status = "blocked"; return x }(), "not configured"},
-		{"invalid created_at", func() check.Item { x := base; x.Issue.Frontmatter.CreatedAt = "2026-01-01"; return x }(), "created_at"},
-		{"invalid deferred_until", func() check.Item { x := base; x.Issue.Frontmatter.DeferredUntil = "bad"; return x }(), "deferred_until"},
-		{"invalid deadline", func() check.Item { x := base; x.Issue.Frontmatter.Deadline = "bad"; return x }(), "deadline"},
-		{"invalid started_at", func() check.Item { x := base; x.Issue.Frontmatter.StartedAt = "bad"; return x }(), "started_at"},
-		{"invalid completed_at", func() check.Item { x := base; x.Issue.Frontmatter.CompletedAt = "bad"; return x }(), "completed_at"},
+		{"missing title", func() issue.Item { x := base; x.Issue.Frontmatter.Title = ""; return x }(), "missing title"},
+		{"missing status", func() issue.Item { x := base; x.Issue.Frontmatter.Status = ""; return x }(), "missing status"},
+		{"missing labels", func() issue.Item { x := base; x.Issue.Frontmatter.Labels = nil; return x }(), "missing labels"},
+		{"missing created_at", func() issue.Item { x := base; x.Issue.Frontmatter.CreatedAt = ""; return x }(), "missing created_at"},
+		{"invalid status", func() issue.Item { x := base; x.Issue.Frontmatter.Status = "blocked"; return x }(), "not configured"},
+		{"invalid created_at", func() issue.Item { x := base; x.Issue.Frontmatter.CreatedAt = "2026-01-01"; return x }(), "created_at"},
+		{"invalid deferred_until", func() issue.Item { x := base; x.Issue.Frontmatter.DeferredUntil = "bad"; return x }(), "deferred_until"},
+		{"invalid deadline", func() issue.Item { x := base; x.Issue.Frontmatter.Deadline = "bad"; return x }(), "deadline"},
+		{"invalid started_at", func() issue.Item { x := base; x.Issue.Frontmatter.StartedAt = "bad"; return x }(), "started_at"},
+		{"invalid completed_at", func() issue.Item { x := base; x.Issue.Frontmatter.CompletedAt = "bad"; return x }(), "completed_at"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -169,7 +151,7 @@ func TestValidateItem(t *testing.T) {
 }
 
 // blockedByItem builds an Item with a blocked_by list.
-func blockedByItem(id string, blockedBy []string) check.Item {
+func blockedByItem(id string, blockedBy []string) issue.Item {
 	it := item(id, "open", nil, "2026-01-01T10:00")
 	it.Issue.Frontmatter.BlockedBy = blockedBy
 	return it
@@ -177,7 +159,7 @@ func blockedByItem(id string, blockedBy []string) check.Item {
 
 func TestValidateBlockedBy(t *testing.T) {
 	t.Run("valid vault", func(t *testing.T) {
-		items := []check.Item{
+		items := []issue.Item{
 			blockedByItem("pkm-001", nil),
 			blockedByItem("pkm-002", []string{"pkm-001"}),
 		}
@@ -187,7 +169,7 @@ func TestValidateBlockedBy(t *testing.T) {
 	})
 
 	t.Run("reference to a done Issue is valid", func(t *testing.T) {
-		items := []check.Item{
+		items := []issue.Item{
 			blockedByItem("pkm-001", nil),
 			blockedByItem("pkm-002", []string{"pkm-001"}),
 		}
@@ -198,7 +180,7 @@ func TestValidateBlockedBy(t *testing.T) {
 	})
 
 	t.Run("unknown reference", func(t *testing.T) {
-		items := []check.Item{
+		items := []issue.Item{
 			blockedByItem("pkm-001", nil),
 			blockedByItem("pkm-002", []string{"pkm-999"}),
 		}
@@ -209,7 +191,7 @@ func TestValidateBlockedBy(t *testing.T) {
 	})
 
 	t.Run("self-block", func(t *testing.T) {
-		items := []check.Item{
+		items := []issue.Item{
 			blockedByItem("pkm-001", []string{"pkm-001"}),
 		}
 		err := check.ValidateBlockedBy(items)
@@ -219,7 +201,7 @@ func TestValidateBlockedBy(t *testing.T) {
 	})
 
 	t.Run("two-cycle", func(t *testing.T) {
-		items := []check.Item{
+		items := []issue.Item{
 			blockedByItem("pkm-001", []string{"pkm-002"}),
 			blockedByItem("pkm-002", []string{"pkm-001"}),
 		}
@@ -231,7 +213,7 @@ func TestValidateBlockedBy(t *testing.T) {
 	})
 
 	t.Run("three-cycle", func(t *testing.T) {
-		items := []check.Item{
+		items := []issue.Item{
 			blockedByItem("pkm-001", []string{"pkm-002"}),
 			blockedByItem("pkm-002", []string{"pkm-003"}),
 			blockedByItem("pkm-003", []string{"pkm-001"}),
@@ -244,7 +226,7 @@ func TestValidateBlockedBy(t *testing.T) {
 	})
 
 	t.Run("cycle reachable only through a non-cycle start", func(t *testing.T) {
-		items := []check.Item{
+		items := []issue.Item{
 			blockedByItem("pkm-001", []string{"pkm-002"}),
 			blockedByItem("pkm-002", []string{"pkm-003"}),
 			blockedByItem("pkm-003", []string{"pkm-004"}),
@@ -260,7 +242,7 @@ func TestValidateBlockedBy(t *testing.T) {
 	t.Run("cycle in a later Issue after an acyclic start", func(t *testing.T) {
 		// The first Item is acyclic, so a walk that stops at the first
 		// visited Item would miss the cycle between pkm-002 and pkm-003.
-		items := []check.Item{
+		items := []issue.Item{
 			blockedByItem("pkm-001", nil),
 			blockedByItem("pkm-002", []string{"pkm-003"}),
 			blockedByItem("pkm-003", []string{"pkm-002"}),
@@ -277,7 +259,7 @@ func TestValidateBlockedBy(t *testing.T) {
 		// references pkm-001; nothing is cyclic. A walk that abandons
 		// the chain after its first acyclic subtree would report a
 		// false cycle through the abandoned path.
-		items := []check.Item{
+		items := []issue.Item{
 			blockedByItem("pkm-001", []string{"pkm-002"}),
 			blockedByItem("pkm-002", []string{"pkm-003"}),
 			blockedByItem("pkm-003", nil),
@@ -289,7 +271,7 @@ func TestValidateBlockedBy(t *testing.T) {
 	})
 
 	t.Run("unknown reference is reported before a cycle", func(t *testing.T) {
-		items := []check.Item{
+		items := []issue.Item{
 			blockedByItem("pkm-001", []string{"pkm-002"}),
 			blockedByItem("pkm-002", []string{"pkm-001"}),
 			blockedByItem("pkm-003", []string{"pkm-999"}),

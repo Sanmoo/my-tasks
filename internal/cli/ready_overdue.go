@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Sanmoo/my-tasks2/internal/exitcode"
+	"github.com/Sanmoo/my-tasks2/internal/issue"
 	"github.com/Sanmoo/my-tasks2/internal/list"
 )
 
@@ -15,7 +16,7 @@ import (
 // available now — not future-deferred and not blocked — in the vault's
 // established priority order.
 func newReadyCmd() *cobra.Command {
-	return newIssueQueryCmd("ready", "List open Issues available now", func(item list.Item, now time.Time, statusByID map[string]string) bool {
+	return newIssueQueryCmd("ready", "List open Issues available now", func(item issue.Item, now time.Time, statusByID map[string]string) bool {
 		return list.Ready(item, now) && !list.Blocked(item.Issue.Frontmatter.BlockedBy, statusByID)
 	})
 }
@@ -74,7 +75,7 @@ func runOverdue(cmd *cobra.Command) error {
 // newIssueQueryCmd builds a read-only query command over a vault's Issues.
 // All queries keep list's priority order and line format, but apply their own
 // eligibility rule. An empty result is a successful, empty output.
-func newIssueQueryCmd(use, short string, matches func(list.Item, time.Time, map[string]string) bool) *cobra.Command {
+func newIssueQueryCmd(use, short string, matches func(issue.Item, time.Time, map[string]string) bool) *cobra.Command {
 	return &cobra.Command{
 		Use:   use,
 		Short: short,
@@ -93,7 +94,7 @@ func newIssueQueryCmd(use, short string, matches func(list.Item, time.Time, map[
 // runIssueQuery loads and orders all Issues, then prints those matched by the
 // query. It intentionally does not warn about duplicate ranks: unlike list,
 // these focused views do not serve as vault-integrity reporting.
-func runIssueQuery(cmd *cobra.Command, matches func(list.Item, time.Time, map[string]string) bool) error {
+func runIssueQuery(cmd *cobra.Command, matches func(issue.Item, time.Time, map[string]string) bool) error {
 	vaultDir, err := resolveVault(cmd)
 	if err != nil {
 		return err

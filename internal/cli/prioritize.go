@@ -47,14 +47,14 @@ func runPrioritize(cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	issues, err := loadPriorityIssues(vaultDir)
+	items, err := loadItems(vaultDir)
 	if err != nil {
 		return err
 	}
-	prioritizable := make([]priority.Issue, 0, len(issues))
-	for _, is := range issues {
-		if priority.Prioritizable(is.Status) {
-			prioritizable = append(prioritizable, is)
+	prioritizable := make([]issue.Item, 0, len(items))
+	for _, it := range items {
+		if priority.Prioritizable(it.Issue.Frontmatter.Status) {
+			prioritizable = append(prioritizable, it)
 		}
 	}
 
@@ -76,7 +76,7 @@ func runPrioritize(cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	changes, err := priority.Plan(entries, issues)
+	changes, err := priority.Plan(entries, items)
 	if err != nil {
 		return err
 	}
@@ -114,38 +114,9 @@ func writeBuffer(buffer string) (string, error) {
 	return path, nil
 }
 
-// loadPriorityIssues reuses the CLI's shared issue-file loader and
-// projects each parsed Issue into the minimal priority.Issue view.
-func loadPriorityIssues(vaultDir string) ([]priority.Issue, error) {
-	items, err := loadItems(vaultDir)
-	if err != nil {
-		return nil, err
-	}
-	return priorityIssuesFromItems(items), nil
-}
-
-func priorityIssueFrom(id string, i issue.Issue) priority.Issue {
-	fm := i.Frontmatter
-	return priority.Issue{
-		ID:        id,
-		Title:     fm.Title,
-		Status:    fm.Status,
-		Rank:      fm.Rank,
-		CreatedAt: fm.CreatedAt,
-	}
-}
-
-func priorityIssuesFromItems(items []issue.Item) []priority.Issue {
-	issues := make([]priority.Issue, 0, len(items))
-	for _, item := range items {
-		issues = append(issues, priorityIssueFrom(item.ID, item.Issue))
-	}
-	return issues
-}
-
 // applyRankChanges applies each rank change in-process, without spawning a
 // subprocess per issue.
-func applyRankChanges(vaultDir string, changes []priority.Change) error {
+func applyRankChanges(vaultDir string, changes []issue.Change) error {
 	for _, ch := range changes {
 		if err := writeRank(vaultDir, ch.ID, ch.Rank); err != nil {
 			return err

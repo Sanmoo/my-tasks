@@ -3,6 +3,8 @@ package priority
 import (
 	"fmt"
 	"slices"
+
+	"github.com/Sanmoo/my-tasks2/internal/issue"
 )
 
 // This file holds the pure logic of the Encaixe: discovering the rank of one
@@ -16,47 +18,48 @@ import (
 // a process concern and stays in internal/cli.
 
 // Candidates returns the reference list for placing id: the vault's ranked,
-// prioritizable Issues in Compare order (rank, then ID), with the Issue being
-// placed left out — a session never compares an Issue with itself. Backlog
-// Issues (no rank) are not candidates: the Backlog is not ordered by
+// prioritizable Items in Fila order (rank, then ID), with the Item being
+// placed left out — a session never compares an Item with itself. Backlog
+// Items (no rank) are not candidates: the Backlog is not ordered by
 // priority, so a Comparação against one would ask about a position the queue
-// never uses. Non-prioritizable Issues (done, custom status) are not
+// never uses. Non-prioritizable Items (done, custom status) are not
 // candidates either: they hold ranks after the queue (N+1..M) and stay there.
-func Candidates(issues []Issue, id string) []Issue {
-	candidates := make([]Issue, 0, len(issues))
-	for _, is := range issues {
-		if is.ID == id || is.Rank == nil || !Prioritizable(is.Status) {
+func Candidates(items []issue.Item, id string) []issue.Item {
+	candidates := make([]issue.Item, 0, len(items))
+	for _, it := range items {
+		fm := it.Issue.Frontmatter
+		if it.ID == id || fm.Rank == nil || !Prioritizable(fm.Status) {
 			continue
 		}
-		candidates = append(candidates, is)
+		candidates = append(candidates, it)
 	}
-	slices.SortFunc(candidates, Compare)
+	slices.SortFunc(candidates, issue.Compare)
 	return candidates
 }
 
-// PlacementTarget returns the Issue that id names among issues for an
+// PlacementTarget returns the Item that id names among items for an
 // Encaixe: it has to exist and be prioritizable (open or in_progress). A
 // session validates its target before its first Comparação, so an unknown or
 // finished Issue fails without asking anything.
-func PlacementTarget(issues []Issue, id string) (Issue, error) {
-	return findPrioritizable(issues, id)
+func PlacementTarget(items []issue.Item, id string) (issue.Item, error) {
+	return findPrioritizable(items, id)
 }
 
-// findPrioritizable returns the Issue id names among issues, or an error: an
+// findPrioritizable returns the Item id names among items, or an error: an
 // unknown ID, or a known Issue that is not prioritizable (done or a custom
 // status). It is the eligibility rule shared by the ordering plans and the
 // Encaixe session.
-func findPrioritizable(issues []Issue, id string) (Issue, error) {
-	for _, is := range issues {
-		if is.ID != id {
+func findPrioritizable(items []issue.Item, id string) (issue.Item, error) {
+	for _, it := range items {
+		if it.ID != id {
 			continue
 		}
-		if !Prioritizable(is.Status) {
-			return Issue{}, fmt.Errorf("issue %s is %s and cannot be prioritized", id, is.Status)
+		if status := it.Issue.Frontmatter.Status; !Prioritizable(status) {
+			return issue.Item{}, fmt.Errorf("issue %s is %s and cannot be prioritized", id, status)
 		}
-		return is, nil
+		return it, nil
 	}
-	return Issue{}, fmt.Errorf("unknown issue ID %q", id)
+	return issue.Item{}, fmt.Errorf("unknown issue ID %q", id)
 }
 
 // Answer is the reply to one Comparação.
@@ -81,7 +84,7 @@ const (
 // interval of queue positions still possible. The zero value is not a valid
 // session; use NewPlace.
 type Place struct {
-	candidates []Issue
+	candidates []issue.Item
 	// lo and hi bound the remaining interval of slots: slot i means "before
 	// Candidate i", so the N Candidates offer N+1 slots (0..N). The session
 	// is over when a single slot is left.
@@ -89,10 +92,11 @@ type Place struct {
 	asked  int
 }
 
-// NewPlace starts a session over candidates, which must be in Compare order
-// and must not contain the Issue being placed (see Candidates). The slice is
-// copied, so the caller's order is not shared with the session.
-func NewPlace(candidates []Issue) *Place {
+// NewPlace starts a session over candidates, which must be in Fila order
+// (see issue.Compare) and must not contain the Item being placed (see
+// Candidates). The slice is copied, so the caller's order is not shared
+// with the session.
+func NewPlace(candidates []issue.Item) *Place {
 	copied := slices.Clone(candidates)
 	// The N Candidates offer N+1 slots, so the interval starts at N+1 — not
 	// at the candidate count, which would leave the last slot unsearchable.
@@ -103,9 +107,9 @@ func NewPlace(candidates []Issue) *Place {
 // the one the current Comparação asks about. It reports false when the
 // session is over (see Finished), which is the case from the start for an
 // empty queue.
-func (p *Place) Question() (Issue, bool) {
+func (p *Place) Question() (issue.Item, bool) {
 	if p.Finished() {
-		return Issue{}, false
+		return issue.Item{}, false
 	}
 	return p.candidates[p.middle()], true
 }

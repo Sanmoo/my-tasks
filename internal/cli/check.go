@@ -12,7 +12,6 @@ import (
 	"github.com/Sanmoo/my-tasks2/internal/issue"
 	"github.com/Sanmoo/my-tasks2/internal/issuefiles"
 	"github.com/Sanmoo/my-tasks2/internal/list"
-	"github.com/Sanmoo/my-tasks2/internal/priority"
 	"github.com/Sanmoo/my-tasks2/internal/vault"
 )
 
@@ -58,7 +57,7 @@ func runCheck(cmd *cobra.Command, fix bool) error {
 		return err
 	}
 	if fix {
-		changes := priority.RenormalizeRanks(priorityIssuesFromCheckItems(items))
+		changes := issue.RenormalizeRanks(items)
 		if err := applyRankChanges(vaultDir, changes); err != nil {
 			return err
 		}
@@ -111,14 +110,6 @@ func duplicateRankDetails(items []issue.Item, ranks []int) string {
 		details[i] = fmt.Sprintf("%d (%s)", rank, strings.Join(byRank[rank], ", "))
 	}
 	return strings.Join(details, "; ")
-}
-
-func priorityIssuesFromCheckItems(items []issue.Item) []priority.Issue {
-	issues := make([]priority.Issue, 0, len(items))
-	for _, item := range items {
-		issues = append(issues, priorityIssueFrom(item.ID, item.Issue))
-	}
-	return issues
 }
 
 // validateVault runs the per-Issue schema checks (frontmatter values,

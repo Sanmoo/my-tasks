@@ -6,31 +6,32 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Sanmoo/my-tasks2/internal/issue"
 	"github.com/Sanmoo/my-tasks2/internal/priority"
 )
 
-// placeCandidates builds n queued Issues already in Compare order (ranks
+// placeCandidates builds n queued Items already in Fila order (ranks
 // 1..n), which is what a Place session expects as its reference list.
-func placeCandidates(n int) []priority.Issue {
-	candidates := make([]priority.Issue, 0, n)
+func placeCandidates(n int) []issue.Item {
+	candidates := make([]issue.Item, 0, n)
 	for i := range n {
-		candidates = append(candidates, priority.Issue{
-			ID:        fmt.Sprintf("c%02d", i+1),
-			Title:     fmt.Sprintf("Candidate %d", i+1),
-			Status:    "open",
-			Rank:      ptr(i + 1),
-			CreatedAt: fmt.Sprintf("2026-01-%02dT10:00", i+1),
-		})
+		candidates = append(candidates, titled(
+			fmt.Sprintf("c%02d", i+1),
+			fmt.Sprintf("Candidate %d", i+1),
+			"open",
+			ptr(i+1),
+			fmt.Sprintf("2026-01-%02dT10:00", i+1),
+		))
 	}
 	return candidates
 }
 
 // candidateIndex is the position of the Issue the session asked about in the
 // reference list — the mid the oracle needs to answer consistently.
-func candidateIndex(t *testing.T, candidates []priority.Issue, id string) int {
+func candidateIndex(t *testing.T, candidates []issue.Item, id string) int {
 	t.Helper()
-	for i, is := range candidates {
-		if is.ID == id {
+	for i, it := range candidates {
+		if it.ID == id {
 			return i
 		}
 	}
@@ -58,51 +59,51 @@ func ceilLog2(n int) int {
 	return total
 }
 
-func TestCandidatesKeepsOnlyQueuedPrioritizableIssues(t *testing.T) {
-	issues := []priority.Issue{
-		{ID: "b1", Title: "Backlog", Status: "open", CreatedAt: "2026-01-01T10:00"},
-		{ID: "r2", Title: "Rank 2", Status: "open", Rank: ptr(2), CreatedAt: "2026-01-02T10:00"},
-		{ID: "target", Title: "Placed", Status: "open", Rank: ptr(3), CreatedAt: "2026-01-03T10:00"},
-		{ID: "r1", Title: "Rank 1", Status: "in_progress", Rank: ptr(1), CreatedAt: "2026-01-04T10:00"},
-		{ID: "r9", Title: "Finished", Status: "done", Rank: ptr(9), CreatedAt: "2026-01-05T10:00"},
-		{ID: "rc", Title: "Review", Status: "review", Rank: ptr(4), CreatedAt: "2026-01-06T10:00"},
+func TestCandidatesKeepsOnlyQueuedPrioritizableItems(t *testing.T) {
+	items := []issue.Item{
+		titled("b1", "Backlog", "open", nil, "2026-01-01T10:00"),
+		titled("r2", "Rank 2", "open", ptr(2), "2026-01-02T10:00"),
+		titled("target", "Placed", "open", ptr(3), "2026-01-03T10:00"),
+		titled("r1", "Rank 1", "in_progress", ptr(1), "2026-01-04T10:00"),
+		titled("r9", "Finished", "done", ptr(9), "2026-01-05T10:00"),
+		titled("rc", "Review", "review", ptr(4), "2026-01-06T10:00"),
 	}
 
-	got := priority.Candidates(issues, "target")
+	got := priority.Candidates(items, "target")
 
 	ids := make([]string, 0, len(got))
-	for _, is := range got {
-		ids = append(ids, is.ID)
+	for _, it := range got {
+		ids = append(ids, it.ID)
 	}
 	// Rank order, without the Issue being placed, the Backlog, done and the
 	// custom status.
 	if want := []string{"r1", "r2"}; !slices.Equal(ids, want) {
 		t.Errorf("Candidates() = %v, want %v", ids, want)
 	}
-	if len(issues) != 6 {
-		t.Errorf("Candidates() mutated its input: len = %d, want 6", len(issues))
+	if len(items) != 6 {
+		t.Errorf("Candidates() mutated its input: len = %d, want 6", len(items))
 	}
 }
 
 func TestCandidatesIsEmptyWithoutAQueue(t *testing.T) {
-	issues := []priority.Issue{
-		{ID: "b1", Title: "Backlog", Status: "open", CreatedAt: "2026-01-01T10:00"},
-		{ID: "d1", Title: "Finished", Status: "done", Rank: ptr(1), CreatedAt: "2026-01-02T10:00"},
+	items := []issue.Item{
+		titled("b1", "Backlog", "open", nil, "2026-01-01T10:00"),
+		titled("d1", "Finished", "done", ptr(1), "2026-01-02T10:00"),
 	}
-	if got := priority.Candidates(issues, "b1"); len(got) != 0 {
+	if got := priority.Candidates(items, "b1"); len(got) != 0 {
 		t.Errorf("Candidates() = %v, want empty", got)
 	}
 }
 
 func TestPlacementTarget(t *testing.T) {
-	issues := []priority.Issue{
-		{ID: "open", Title: "Open", Status: "open"},
-		{ID: "doing", Title: "Doing", Status: "in_progress"},
-		{ID: "finished", Title: "Finished", Status: "done"},
-		{ID: "review", Title: "Review", Status: "review"},
+	items := []issue.Item{
+		titled("open", "Open", "open", nil, ""),
+		titled("doing", "Doing", "in_progress", nil, ""),
+		titled("finished", "Finished", "done", nil, ""),
+		titled("review", "Review", "review", nil, ""),
 	}
 	for _, id := range []string{"open", "doing"} {
-		target, err := priority.PlacementTarget(issues, id)
+		target, err := priority.PlacementTarget(items, id)
 		if err != nil {
 			t.Errorf("PlacementTarget(%q) error = %v, want none", id, err)
 		}
@@ -119,7 +120,7 @@ func TestPlacementTarget(t *testing.T) {
 		{"nope", `unknown issue ID "nope"`},
 	}
 	for _, tt := range tests {
-		_, err := priority.PlacementTarget(issues, tt.id)
+		_, err := priority.PlacementTarget(items, tt.id)
 		if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 			t.Errorf("PlacementTarget(%q) error = %v, want %q", tt.id, err, tt.wantErr)
 		}
@@ -266,14 +267,15 @@ func TestPlaceAnswerAfterTheEndIsIgnored(t *testing.T) {
 func TestPlaceCopiesTheCandidates(t *testing.T) {
 	candidates := placeCandidates(1)
 	place := priority.NewPlace(candidates)
-	candidates[0].Title = "mutated"
-	candidates[0].Status = "done"
+	candidates[0].Issue.Frontmatter.Title = "mutated"
+	candidates[0].Issue.Frontmatter.Status = "done"
 
 	question, ok := place.Question()
 	if !ok {
 		t.Fatal("Question() reported a finished session")
 	}
-	if question.Title != "Candidate 1" || question.Status != "open" {
+	fm := question.Issue.Frontmatter
+	if fm.Title != "Candidate 1" || fm.Status != "open" {
 		t.Errorf("Question() = %+v, want the copy taken at NewPlace", question)
 	}
 }
@@ -322,17 +324,14 @@ func TestPlaceRankDrivesTheQueueOrder(t *testing.T) {
 	const queue = 5
 	for _, ranked := range []bool{true, false} {
 		for slot := range queue + 1 {
-			issues := placeCandidates(queue)
-			target := priority.Issue{
-				ID: "target", Title: "Nova", Status: "open",
-				CreatedAt: "2026-02-01T10:00", Rank: ptr(3),
-			}
+			items := placeCandidates(queue)
+			target := titled("target", "Nova", "open", ptr(3), "2026-02-01T10:00")
 			if !ranked {
-				target.Rank = nil
+				target.Issue.Frontmatter.Rank = nil
 			}
-			issues = append(issues, target)
+			items = append(items, target)
 
-			candidates := priority.Candidates(issues, "target")
+			candidates := priority.Candidates(items, "target")
 			place := priority.NewPlace(candidates)
 			for {
 				question, ok := place.Question()
@@ -342,22 +341,22 @@ func TestPlaceRankDrivesTheQueueOrder(t *testing.T) {
 				place.Answer(slotAnswer(slot, candidateIndex(t, candidates, question.ID)))
 			}
 
-			changes, err := priority.QuickPlan(issues, "target", priority.MoveToRank, place.Rank())
+			changes, err := priority.QuickPlan(items, "target", priority.MoveToRank, place.Rank())
 			if err != nil {
 				t.Fatalf("ranked = %v, slot = %d: QuickPlan error = %v", ranked, slot, err)
 			}
-			updated := slices.Clone(issues)
+			updated := slices.Clone(items)
 			for _, ch := range changes {
 				for i := range updated {
 					if updated[i].ID == ch.ID {
-						updated[i].Rank = ch.Rank
+						updated[i].Issue.Frontmatter.Rank = ch.Rank
 					}
 				}
 			}
-			slices.SortFunc(updated, priority.Compare)
+			slices.SortFunc(updated, issue.Compare)
 			placed := 0
-			for i, is := range updated {
-				if is.ID == "target" {
+			for i, it := range updated {
+				if it.ID == "target" {
 					placed = i
 				}
 			}

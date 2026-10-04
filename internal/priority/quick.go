@@ -3,6 +3,8 @@ package priority
 import (
 	"fmt"
 	"slices"
+
+	"github.com/Sanmoo/my-tasks2/internal/issue"
 )
 
 // QuickAction identifies the immediate order change requested by a quick
@@ -22,31 +24,31 @@ const (
 
 // QuickPlan computes the minimal rank changes for a quick ordering action.
 // The position is the one-based final queue position for MoveToRank and is
-// ignored by the other actions. Non-prioritizable issues are not part of the
+// ignored by the other actions. Non-prioritizable Issues are not part of the
 // queue, just as they are not part of the prioritize buffer.
-func QuickPlan(issues []Issue, id string, action QuickAction, position int) ([]Change, error) {
-	target, err := findPrioritizable(issues, id)
+func QuickPlan(items []issue.Item, id string, action QuickAction, position int) ([]issue.Change, error) {
+	target, err := findPrioritizable(items, id)
 	if err != nil {
 		return nil, err
 	}
 
-	ordered := prioritizableIssues(issues)
-	queue := make([]Issue, 0, len(ordered))
-	backlog := make([]Issue, 0, len(ordered))
-	for _, is := range ordered {
-		if is.ID == id {
+	ordered := prioritizableItems(items)
+	queue := make([]issue.Item, 0, len(ordered))
+	backlog := make([]issue.Item, 0, len(ordered))
+	for _, it := range ordered {
+		if it.ID == id {
 			continue
 		}
-		if is.Rank == nil {
-			backlog = append(backlog, is)
+		if it.Issue.Frontmatter.Rank == nil {
+			backlog = append(backlog, it)
 		} else {
-			queue = append(queue, is)
+			queue = append(queue, it)
 		}
 	}
 
 	switch action {
 	case MoveTop:
-		queue = append([]Issue{target}, queue...)
+		queue = append([]issue.Item{target}, queue...)
 	case MoveBottom:
 		queue = append(queue, target)
 	case MoveToRank:
@@ -54,7 +56,7 @@ func QuickPlan(issues []Issue, id string, action QuickAction, position int) ([]C
 		if position < 1 || position > finalLength {
 			return nil, fmt.Errorf("rank position must be between 1 and %d", finalLength)
 		}
-		queue = append(queue, Issue{})
+		queue = append(queue, issue.Item{})
 		copy(queue[position:], queue[position-1:])
 		queue[position-1] = target
 	case RemoveRank:
@@ -62,27 +64,27 @@ func QuickPlan(issues []Issue, id string, action QuickAction, position int) ([]C
 	default:
 		return nil, fmt.Errorf("unsupported quick ordering action %d", action)
 	}
-	return planOrdered(queue, backlog, issues)
+	return planOrdered(queue, backlog, items)
 }
 
-func planOrdered(queue, backlog []Issue, all []Issue) ([]Change, error) {
+func planOrdered(queue, backlog []issue.Item, all []issue.Item) ([]issue.Change, error) {
 	entries := make([]Entry, 0, len(queue)+len(backlog))
-	for _, is := range queue {
-		entries = append(entries, Entry{Prioritized: true, ID: is.ID})
+	for _, it := range queue {
+		entries = append(entries, Entry{Prioritized: true, ID: it.ID})
 	}
-	for _, is := range backlog {
-		entries = append(entries, Entry{ID: is.ID})
+	for _, it := range backlog {
+		entries = append(entries, Entry{ID: it.ID})
 	}
 	return Plan(entries, all)
 }
 
-func prioritizableIssues(issues []Issue) []Issue {
-	ordered := make([]Issue, 0, len(issues))
-	for _, is := range issues {
-		if Prioritizable(is.Status) {
-			ordered = append(ordered, is)
+func prioritizableItems(items []issue.Item) []issue.Item {
+	ordered := make([]issue.Item, 0, len(items))
+	for _, it := range items {
+		if Prioritizable(it.Issue.Frontmatter.Status) {
+			ordered = append(ordered, it)
 		}
 	}
-	slices.SortFunc(ordered, Compare)
+	slices.SortFunc(ordered, issue.Compare)
 	return ordered
 }

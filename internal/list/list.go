@@ -1,6 +1,7 @@
 // Package list holds the pure logic of `mt list` and `mt pick-next`: the
-// Rank ordering of issues (Rank → Backlog by created_at → ID), the
-// per-status glyphs, the visibility rules (only done hides by default;
+// Rank ordering of issues (the Fila order, issue.Compare — the rule
+// itself lives in internal/issue), the per-status glyphs, the
+// visibility rules (only done hides by default;
 // status/label filters), the single availability predicate over the
 // whole Vault and its deferred-until suffix rules, the computed blocked
 // state (an Issue is blocked while any ID in its blocked_by is not
@@ -11,7 +12,6 @@
 package list
 
 import (
-	"cmp"
 	"errors"
 	"fmt"
 	"slices"
@@ -45,43 +45,12 @@ func Glyph(status string) string {
 	}
 }
 
-// Compare orders two items under the list order: lower rank first
-// (issues without a rank form the Backlog and come last, ordered by
-// created_at), then ID as the final tiebreak everywhere. created_at is
-// compared as a string, which equals chronological order for the
-// canonical zero-padded, fixed-width stamp (issue.NaiveLayout); a
-// hand-edited stamp that drifts from that layout is mt check's to flag.
-func Compare(a, b issue.Item) int {
-	ar, br := a.Issue.Frontmatter.Rank, b.Issue.Frontmatter.Rank
-	if ar != nil && br != nil {
-		if c := cmp.Compare(*ar, *br); c != 0 {
-			return c
-		}
-		return compareID(a.ID, b.ID)
-	}
-	if ar != nil {
-		return -1 // a is ranked, b is Backlog → a first
-	}
-	if br != nil {
-		return 1 // a is Backlog, b is ranked → b first
-	}
-	// Both Backlog: oldest created_at first (lexicographic, see Compare),
-	// then ID.
-	if c := cmp.Compare(a.Issue.Frontmatter.CreatedAt, b.Issue.Frontmatter.CreatedAt); c != 0 {
-		return c
-	}
-	return compareID(a.ID, b.ID)
-}
-
-// compareID orders two IDs ascending. A plain string comparison is the
-// order of last resort: IDs are unique per vault, so it makes the list
-// order total and deterministic even under a duplicate rank.
-func compareID(a, b string) int { return cmp.Compare(a, b) }
-
-// Sort orders items in place by Compare.
+// Sort orders items in place under the Fila order — the domain rule,
+// issue.Compare, is consumed here rather than restated, so the vistas
+// and the rest of the tool can never drift apart.
 func Sort(items []issue.Item) {
 	sort.SliceStable(items, func(i, j int) bool {
-		return Compare(items[i], items[j]) < 0
+		return issue.Compare(items[i], items[j]) < 0
 	})
 }
 

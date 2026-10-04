@@ -3,8 +3,8 @@
 // (renormalization 1..N with minimal rewrite) for both editor and quick
 // commands. It is decision-dense, so
 // it lives at Seam 2: black-box unit tested, with the coverage and
-// mutation gates. Reading and writing the issue files themselves is a
-// process concern and stays in internal/cli.
+// mutation gates. Reading and writing the issue files themselves lives
+// in internal/issuefiles.
 package priority
 
 import (

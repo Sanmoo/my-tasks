@@ -5,8 +5,8 @@
 // the computed blocked state (an Issue is blocked while any ID in its
 // blocked_by is not done), and duplicate-rank detection. It is
 // decision-dense, so it lives at Seam 2: black-box unit tested, with the
-// coverage and mutation gates. Reading the issue files themselves is a
-// process concern and stays in internal/cli.
+// coverage and mutation gates. Reading the issue files themselves lives
+// in internal/issuefiles.
 package list
 
 import (

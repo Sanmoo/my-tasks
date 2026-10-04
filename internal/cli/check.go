@@ -10,6 +10,7 @@ import (
 	"github.com/Sanmoo/my-tasks2/internal/check"
 	"github.com/Sanmoo/my-tasks2/internal/exitcode"
 	"github.com/Sanmoo/my-tasks2/internal/issue"
+	"github.com/Sanmoo/my-tasks2/internal/issuefiles"
 	"github.com/Sanmoo/my-tasks2/internal/list"
 	"github.com/Sanmoo/my-tasks2/internal/priority"
 	"github.com/Sanmoo/my-tasks2/internal/vault"
@@ -86,7 +87,7 @@ func runCheck(cmd *cobra.Command, fix bool) error {
 }
 
 func loadCheckItems(vaultDir string) ([]issue.Item, error) {
-	files, err := readIssueFiles(vaultDir)
+	files, err := issuefiles.Open(vaultDir).ListFiles()
 	if err != nil {
 		return nil, fmt.Errorf("malformed frontmatter: %w", err)
 	}
@@ -95,7 +96,7 @@ func loadCheckItems(vaultDir string) ([]issue.Item, error) {
 		if err := check.ValidateFrontmatter(file.Data, file.ID); err != nil {
 			return nil, err
 		}
-		items = append(items, issue.Item{ID: file.ID, Issue: file.Issue})
+		items = append(items, file.Item)
 	}
 	return items, nil
 }

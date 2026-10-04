@@ -194,7 +194,7 @@ func stdoutIsTerminal(w io.Writer) bool {
 // rank: the queue order is ambiguous for pick-next, so a session could not
 // promise a position the rest of the tool honours. Renormalizing is
 // `mt check --fix`'s job, not a silent side effect of asking questions.
-func checkNoDuplicateRanks(items []list.Item) error {
+func checkNoDuplicateRanks(items []issue.Item) error {
 	if dups := list.DuplicateRanks(items); len(dups) > 0 {
 		return fmt.Errorf("duplicate rank: %d (run mt check --fix)", dups[0])
 	}
@@ -204,7 +204,7 @@ func checkNoDuplicateRanks(items []list.Item) error {
 // placeLine renders one side of a Comparação: the compact one-line view of
 // `mt list`, built from the priority projection the session works with.
 func placeLine(is priority.Issue) string {
-	return list.FormatLine(list.Item{ID: is.ID, Issue: issue.Issue{Frontmatter: issue.Frontmatter{
+	return list.FormatLine(issue.Item{ID: is.ID, Issue: issue.Issue{Frontmatter: issue.Frontmatter{
 		Title:  is.Title,
 		Status: is.Status,
 	}}})

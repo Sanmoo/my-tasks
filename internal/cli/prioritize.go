@@ -13,7 +13,6 @@ import (
 
 	"github.com/Sanmoo/my-tasks2/internal/exitcode"
 	"github.com/Sanmoo/my-tasks2/internal/issue"
-	"github.com/Sanmoo/my-tasks2/internal/list"
 	"github.com/Sanmoo/my-tasks2/internal/priority"
 )
 
@@ -135,7 +134,7 @@ func priorityIssueFrom(id string, i issue.Issue) priority.Issue {
 	}
 }
 
-func priorityIssuesFromItems(items []list.Item) []priority.Issue {
+func priorityIssuesFromItems(items []issue.Item) []priority.Issue {
 	issues := make([]priority.Issue, 0, len(items))
 	for _, item := range items {
 		issues = append(issues, priorityIssueFrom(item.ID, item.Issue))

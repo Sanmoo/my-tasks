@@ -92,3 +92,29 @@ func TestNextIDExhaustsAttempts(t *testing.T) {
 		t.Errorf("error %q does not mention uniqueness", err)
 	}
 }
+
+func TestValidID(t *testing.T) {
+	cases := []struct {
+		name string
+		id   string
+		want bool
+	}{
+		{"prefix plus suffix", "pkm-055", true},
+		{"single character", "a", true},
+		{"dots are an ordinary component", "...md", true},
+		{"space is an ordinary component", "a b", true},
+		{"empty ID is invalid", "", false},
+		{"forward slash is invalid", "pkm-001/extra", false},
+		{"leading slash is invalid", "/etc/passwd", false},
+		{"trailing slash is invalid", "pkm-001/", false},
+		{"backslash is invalid", `pkm-001\extra`, false},
+		{"windows traversal is invalid", `..\..\pkm-001`, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := issue.ValidID(c.id); got != c.want {
+				t.Errorf("ValidID(%q) = %t, want %t", c.id, got, c.want)
+			}
+		})
+	}
+}

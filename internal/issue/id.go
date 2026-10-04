@@ -3,6 +3,7 @@ package issue
 import (
 	"fmt"
 	"io"
+	"strings"
 )
 
 // suffixAlphabet is the symbol set of a random ID suffix: digits and
@@ -16,6 +17,14 @@ const suffixLen = 4
 
 // maxAttempts bounds the collision-retry loop of NextID.
 const maxAttempts = 100
+
+// ValidID reports whether id is a single path component, and therefore
+// names an Issue inside a Vault: non-empty and without a forward or
+// backward slash. Any separator would make issues/<id>.md resolve
+// outside the Vault's issues directory, so it is not an ID at all.
+func ValidID(id string) bool {
+	return id != "" && !strings.ContainsAny(id, `/\`)
+}
 
 // NewID joins the vault prefix and a suffix into an issue ID (ex.:
 // pkm-055). The file name (issues/<id>.md) is the authority; no id field

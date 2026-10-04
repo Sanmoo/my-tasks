@@ -31,7 +31,7 @@ type Options struct {
 
 // OneLine returns the compact list-style representation of an Issue.
 func OneLine(i issue.Issue, id string) string {
-	return list.FormatLine(list.Item{ID: id, Issue: i})
+	return list.FormatLine(issue.Item{ID: id, Issue: i})
 }
 
 // Summary returns the compact metadata view of an Issue. Deferred is

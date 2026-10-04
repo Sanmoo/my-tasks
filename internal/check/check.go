@@ -16,12 +16,6 @@ import (
 	"github.com/Sanmoo/my-tasks2/internal/issue"
 )
 
-// Item is an Issue with the file name that identifies it inside a Vault.
-type Item struct {
-	ID    string
-	Issue issue.Issue
-}
-
 // RankGap is one contiguous missing range in the ranked queue. Start and End
 // are inclusive; a single missing Rank has equal Start and End.
 type RankGap struct {
@@ -33,7 +27,7 @@ type RankGap struct {
 // highest ranked Issue. Backlog Issues (nil Rank) and non-positive Ranks do
 // not form gaps; callers can report those separately. The range form keeps a
 // very large manually edited Rank from forcing a billion-element allocation.
-func RankGapRanges(items []Item) []RankGap {
+func RankGapRanges(items []issue.Item) []RankGap {
 	ranks := make([]int, 0, len(items))
 	for _, item := range items {
 		if rank := item.Issue.Frontmatter.Rank; rank != nil && *rank > 0 {
@@ -59,28 +53,9 @@ func RankGapRanges(items []Item) []RankGap {
 	return gaps
 }
 
-// DuplicateRanks returns the Rank values that occur more than once,
-// sorted ascending. Backlog Issues (nil Rank) do not participate.
-func DuplicateRanks(items []Item) []int {
-	counts := make(map[int]int)
-	for _, item := range items {
-		if rank := item.Issue.Frontmatter.Rank; rank != nil {
-			counts[*rank]++
-		}
-	}
-	duplicates := make([]int, 0)
-	for rank, count := range counts {
-		if count > 1 {
-			duplicates = append(duplicates, rank)
-		}
-	}
-	slices.Sort(duplicates)
-	return duplicates
-}
-
 // NonPositiveRanks returns distinct Rank values that cannot belong to the
 // 1..N queue, sorted ascending.
-func NonPositiveRanks(items []Item) []int {
+func NonPositiveRanks(items []issue.Item) []int {
 	invalid := make(map[int]struct{})
 	for _, item := range items {
 		if rank := item.Issue.Frontmatter.Rank; rank != nil && *rank <= 0 {
@@ -150,7 +125,7 @@ func ValidateFrontmatter(data []byte, id string) error {
 
 // ValidateItem validates the parsed frontmatter values of an Issue against
 // the Vault's configured statuses and the canonical naive datetime layout.
-func ValidateItem(item Item, statuses []string) error {
+func ValidateItem(item issue.Item, statuses []string) error {
 	fm := item.Issue.Frontmatter
 	switch {
 	case fm.Title == "":
@@ -198,7 +173,7 @@ func ValidateItem(item Item, statuses []string) error {
 // violation in a deterministic order — unknown references first (in
 // item order), then self-blocks, then cycles — because mt check
 // reports one problem per run.
-func ValidateBlockedBy(items []Item) error {
+func ValidateBlockedBy(items []issue.Item) error {
 	if err := missingBlockedByRefs(items); err != nil {
 		return err
 	}
@@ -213,7 +188,7 @@ func ValidateBlockedBy(items []Item) error {
 
 // missingBlockedByRefs returns the first blocked_by reference to an ID
 // with no Issue file in the Vault.
-func missingBlockedByRefs(items []Item) error {
+func missingBlockedByRefs(items []issue.Item) error {
 	exists := make(map[string]struct{}, len(items))
 	for _, item := range items {
 		exists[item.ID] = struct{}{}
@@ -230,7 +205,7 @@ func missingBlockedByRefs(items []Item) error {
 
 // selfBlockers returns an error for the first Issue that lists itself
 // in its own blocked_by.
-func selfBlockers(items []Item) error {
+func selfBlockers(items []issue.Item) error {
 	for _, item := range items {
 		if slices.Contains(item.Issue.Frontmatter.BlockedBy, item.ID) {
 			return fmt.Errorf("issue %s lists itself in blocked_by", item.ID)
@@ -245,7 +220,7 @@ func selfBlockers(items []Item) error {
 // references in listed order, so a given Vault always yields the same
 // cycle. References are assumed to exist (missingBlockedByRefs runs
 // first); a self-reference would be caught by selfBlockers.
-func blockedByCycle(items []Item) []string {
+func blockedByCycle(items []issue.Item) []string {
 	refs := make(map[string][]string, len(items))
 	for _, item := range items {
 		refs[item.ID] = item.Issue.Frontmatter.BlockedBy

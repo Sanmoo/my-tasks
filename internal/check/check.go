@@ -1,6 +1,7 @@
 // Package check holds the pure validation and Rank-integrity rules of
-// `mt check`. Reading and writing Issue files remains a process concern in
-// internal/cli; these exported APIs are the Seam 2 unit-test boundary.
+// `mt check`. Reading and writing Issue files lives in
+// internal/issuefiles; these exported APIs are the Seam 2 unit-test
+// boundary.
 package check
 
 import (

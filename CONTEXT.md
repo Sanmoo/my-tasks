@@ -6,6 +6,9 @@ Um issue tracker pessoal baseado em arquivos: cada issue é um arquivo Markdown 
 
 **Issue**:
 Uma unidade de trabalho; um único arquivo Markdown com frontmatter YAML.
+Em disco, a Issue é sempre um arquivo regular dentro de `issues/`: um
+symlink com nome de Issue não é uma Issue — é pulado pela listagem e
+recusado na leitura, na escrita, na edição e na criação.
 _Avoid_: task, tarefa, ticket
 
 **Vault**:

@@ -14,6 +14,7 @@ import (
 
 	"github.com/Sanmoo/my-tasks2/internal/exitcode"
 	"github.com/Sanmoo/my-tasks2/internal/issue"
+	"github.com/Sanmoo/my-tasks2/internal/issuefiles"
 	"github.com/Sanmoo/my-tasks2/internal/list"
 )
 
@@ -105,19 +106,12 @@ func formatListLine(it issue.Item) string {
 	return list.FormatLine(it)
 }
 
-// loadItems reads every *.md file in the vault's issues/ directory and
-// parses it into a list item. The file name (minus .md) is the ID; a
-// malformed file fails the whole list with the offending ID named.
+// loadItems reads every Issue in the vault through the store: the
+// *.md files whose entries are regular files, in directory order. The
+// file name (minus .md) is the ID; a malformed file fails the whole
+// list with the offending ID named, while a symlink is skipped.
 func loadItems(vaultDir string) ([]issue.Item, error) {
-	files, err := readIssueFiles(vaultDir)
-	if err != nil {
-		return nil, err
-	}
-	items := make([]issue.Item, 0, len(files))
-	for _, file := range files {
-		items = append(items, issue.Item{ID: file.ID, Issue: file.Issue})
-	}
-	return items, nil
+	return issuefiles.Open(vaultDir).List()
 }
 
 // duplicateRanksWarning renders the duplicate-rank warning line.

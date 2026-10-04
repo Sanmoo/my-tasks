@@ -124,6 +124,7 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^the file "([^"]*)" has the same timestamp in "([^"]*)" and "([^"]*)"$`, fileHasSameTimestamp)
 	sc.Step(`^the directory "([^"]*)" contains (\d+) files$`, dirContainsNFiles)
 	sc.Step(`^the file "([^"]*)" is written with:$`, fileWrittenWith)
+	sc.Step(`^the symbolic link "([^"]*)" points to "([^"]*)"$`, symbolicLinkPointsTo)
 }
 
 func stateFrom(ctx context.Context) (*state, error) {
@@ -626,6 +627,25 @@ func fileWrittenWith(ctx context.Context, path string, doc *godog.DocString) (co
 	content := st.expand(doc.Content)
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		return ctx, fmt.Errorf("writing %q: %w", path, err)
+	}
+	return ctx, nil
+}
+
+// symbolicLinkPointsTo creates a symlink at path pointing to target,
+// creating parent directories as needed. It is how scenarios plant a
+// stray link in issues/ (or point one outside the Vault).
+func symbolicLinkPointsTo(ctx context.Context, path, target string) (context.Context, error) {
+	st, err := stateFrom(ctx)
+	if err != nil {
+		return ctx, err
+	}
+	path = st.expand(path)
+	target = st.expand(target)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return ctx, fmt.Errorf("creating parent of %q: %w", path, err)
+	}
+	if err := os.Symlink(target, path); err != nil {
+		return ctx, fmt.Errorf("creating symbolic link %q: %w", path, err)
 	}
 	return ctx, nil
 }

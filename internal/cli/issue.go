@@ -5,6 +5,7 @@ package cli
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/Sanmoo/my-tasks2/internal/exitcode"
 	"github.com/Sanmoo/my-tasks2/internal/issue"
+	"github.com/Sanmoo/my-tasks2/internal/issuefiles"
 	"github.com/Sanmoo/my-tasks2/internal/priority"
 	"github.com/Sanmoo/my-tasks2/internal/show"
 	"github.com/Sanmoo/my-tasks2/internal/vault"
@@ -284,17 +286,14 @@ These compact output flags are mutually exclusive.`,
 			if err := checkID(args[0]); err != nil {
 				return err
 			}
-			data, err := os.ReadFile(issuePath(t.dir, args[0]))
+			item, err := issuefiles.Open(t.dir).Read(args[0])
 			if err != nil {
-				if os.IsNotExist(err) {
+				if errors.Is(err, os.ErrNotExist) {
 					return t.notFoundError(args[0])
 				}
-				return fmt.Errorf("reading issue %s: %w", args[0], err)
+				return err
 			}
-			i, err := issue.Parse(data)
-			if err != nil {
-				return fmt.Errorf("parsing issue %s: %w", args[0], err)
-			}
+			i := item.Issue
 			if oneLine {
 				_, err = fmt.Fprintln(cmd.OutOrStdout(), show.OneLine(i, args[0]))
 				return err

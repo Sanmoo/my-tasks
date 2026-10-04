@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/Sanmoo/my-tasks2/internal/issuefiles"
 )
 
 // completeIssueID is the ValidArgsFunction of every command that takes
@@ -43,7 +45,7 @@ func completeIssueID(cmd *cobra.Command, args []string, toComplete string) ([]st
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
-	ids, err := issueIDs(t.dir)
+	ids, err := issuefiles.Open(t.dir).IDs()
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}

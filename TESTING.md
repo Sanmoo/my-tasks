@@ -46,6 +46,24 @@ internal/issue/    pure logic: the Issue frontmatter round-trip (stable field
                    order, optional fields only-when-set, no id/updated_at)
                    and ID generation (prefix + short random suffix, collision
                    retry)
+internal/issuefiles/
+                   pure logic: the single owner of a Vault's Issue files —
+                   listing, reading, writing, editing and creating them.
+                   The file policy written once: a symlink in issues/ is
+                   not an Issue (skipped by every listing, refused by
+                   read/edit/write/create, never reused as an ID), a *.md
+                   directory is skipped, a non-regular entry fails loud,
+                   and Open never loads mt.yaml
+internal/list/     pure logic: the queue order (Rank → Backlog by created_at
+                   → ID), visibility filters, glyphs, deferral suffixes,
+                   the computed blocked state and duplicate-rank detection
+internal/priority/ pure logic: the queue kernel — the prioritize editor
+                   buffer, quick-order plans and rank renormalization;
+                   deliberately imports no other project package
+internal/check/    pure logic: the vault audit — frontmatter schema and
+                   values, blocked_by integrity, rank gaps and duplicates
+internal/show/     pure logic: the structured show view and its one-line
+                   and summary projections
 internal/exitcode/ pure logic: the exit code convention (0/1/2) and error mapping
 internal/deferral/ pure logic: the `mt defer` time-argument parsing — absolute
                    YY-MM-DD HH:MM (year expanded to 20YY) and relative

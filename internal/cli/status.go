@@ -16,6 +16,7 @@ import (
 
 	"github.com/Sanmoo/my-tasks2/internal/exitcode"
 	"github.com/Sanmoo/my-tasks2/internal/issue"
+	"github.com/Sanmoo/my-tasks2/internal/issuefiles"
 	"github.com/Sanmoo/my-tasks2/internal/vault"
 )
 
@@ -202,25 +203,21 @@ func mutateIssue(t vaultTarget, id string, mutate func(issue.Issue) (issue.Issue
 	return i, nil
 }
 
-// readIssue loads and parses the Issue file for id in the target
-// vault; a missing Issue produces the target's not-found error, which
-// names the vault the key's prefix picked and appends the hint for
-// explicit selections. O_NOFOLLOW keeps a symlink in the issues
-// directory from redirecting the read outside the Vault, including if
-// the path changes after discovery.
+// readIssue loads the Issue file for id in the target vault through
+// the store, which refuses a symlink (or any non-regular file) before
+// reading it. A missing Issue produces the target's not-found error,
+// which names the vault the key's prefix picked and appends the hint
+// for explicit selections; the store's own errors already name the
+// operation and the ID, so they propagate unchanged.
 func readIssue(t vaultTarget, id string) (issue.Issue, error) {
-	data, err := readIssueData(t.dir, id)
+	item, err := issuefiles.Open(t.dir).Read(id)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return issue.Issue{}, t.notFoundError(id)
 		}
-		return issue.Issue{}, fmt.Errorf("reading issue %s: %w", id, err)
+		return issue.Issue{}, err
 	}
-	i, err := issue.Parse(data)
-	if err != nil {
-		return issue.Issue{}, fmt.Errorf("parsing issue %s: %w", id, err)
-	}
-	return i, nil
+	return item.Issue, nil
 }
 
 // writeIssueFile renders i and writes it back to its file in the vault.

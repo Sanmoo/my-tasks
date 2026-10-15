@@ -74,12 +74,12 @@ func NonPositiveRanks(items []issue.Item) []int {
 var allowedFrontmatterFields = map[string]struct{}{
 	"title": {}, "status": {}, "labels": {}, "created_at": {}, "rank": {},
 	"deferred_until": {}, "deadline": {}, "started_at": {}, "completed_at": {},
-	"blocked_by": {},
+	"claimed_by": {}, "blocked_by": {},
 }
 
 var optionalFrontmatterFields = map[string]struct{}{
 	"rank": {}, "deferred_until": {}, "deadline": {}, "started_at": {}, "completed_at": {},
-	"blocked_by": {},
+	"claimed_by": {}, "blocked_by": {},
 }
 
 // ValidateFrontmatter validates the YAML mapping and schema-specific keys in
@@ -137,6 +137,12 @@ func ValidateItem(item issue.Item, statuses []string) error {
 		return fmt.Errorf("malformed frontmatter for issue %s: missing labels", item.ID)
 	case fm.CreatedAt == "":
 		return fmt.Errorf("malformed frontmatter for issue %s: missing created_at", item.ID)
+	}
+	// A claim whose only job — recording possession — is blank is a
+	// hand-edited corruption: mt claim never writes one (it collapses
+	// its argument's whitespace).
+	if fm.ClaimedBy != "" && strings.TrimSpace(fm.ClaimedBy) == "" {
+		return fmt.Errorf("malformed frontmatter for issue %s: claimed_by is blank", item.ID)
 	}
 	if !slices.Contains(statuses, fm.Status) {
 		return fmt.Errorf("status %q for issue %s is not configured (valid: %s)",

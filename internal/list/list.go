@@ -76,16 +76,20 @@ func IsFutureDeferred(deferredUntil string, now time.Time) bool {
 // order. It is the single availability predicate — ready iterates its
 // result and pick-next orders it — so no caller builds the status index
 // (StatusByID) or combines halves by hand: available means open, its
-// Deferral (if any) has passed, and nothing not done blocks it.
+// Deferral (if any) has passed, nothing not done blocks it, and no
+// active claim holds it.
 //
 // The canonical definition, with its nuances named here: in_progress,
 // custom statuses and done are never available; an empty or malformed
 // deferred_until does not remove availability (mt check owns format
 // validation); a blocked_by reference to an ID absent from the Vault
 // keeps the Issue Blocked; only done satisfies a block; an empty
-// blocked_by never blocks. Blocked stays a separate question for the
-// [blocked] marker of the listing: a future-deferred Issue is
-// unavailable without being Blocked.
+// blocked_by never blocks; a set claimed_by removes availability — the
+// claim's own format is mt check's (mt claim never writes a blank one).
+// Blocked stays a separate question for the [blocked] marker of the
+// listing: a future-deferred Issue is unavailable without being
+// Blocked, and a claimed open Issue is unavailable without a claim
+// marker ever hiding it from a listing.
 func Available(items []issue.Item, now time.Time) []issue.Item {
 	statusByID := StatusByID(items)
 	available := make([]issue.Item, 0, len(items))
@@ -98,6 +102,9 @@ func Available(items []issue.Item, now time.Time) []issue.Item {
 			continue
 		}
 		if Blocked(fm.BlockedBy, statusByID) {
+			continue
+		}
+		if fm.ClaimedBy != "" {
 			continue
 		}
 		available = append(available, item)

@@ -76,8 +76,20 @@ As nuances, nomeadas em um lugar só: `in_progress`, status customizado e
 `done` nunca são disponíveis; uma Deferral malformada não impede a
 disponibilidade (`mt check` é quem valida formato); uma referência em
 `blocked_by` a um ID inexistente mantém a Issue Blocked; só `done` satisfaz um
-bloqueio; uma lista vazia de bloqueios nunca bloqueia.
+bloqueio; uma lista vazia de bloqueios nunca bloqueia; um Claim ativo torna a
+Issue indisponível mesmo `open` e sem bloqueio (o formato do valor é do
+`mt check` — `mt claim` nunca grava um claim em branco).
 _Avoid_: liberada, elegível, pronta (não confundir com o comando `ready`)
+
+**Claim**:
+O registro de posse de uma Issue: uma sessão assumiu o trabalho antes de
+iniciá-lo. É o campo `claimed_by` no frontmatter — um campo, não um status:
+claimar não muda o status da Issue. Claim ativo torna a Issue indisponível
+(`ready` e `pick-next` pulam); `unclaim` devolve ao circuito, `reopen` limpa o
+claim, `done` preserva como histórico. O valor identifica a sessão que
+claimou, não uma pessoa — o vault é pessoal. Não confundir com `in_progress`,
+que registra que o trabalho começou.
+_Avoid_: assignee, responsável, reserva, lock
 
 **Status**:
 O estado de uma issue: `open`, `in_progress`, `done`, mais status personalizados definidos na configuração do vault. Não há máquina de estados imposta; apenas `pick-next` (→ `in_progress`, pulando issues blocked) e `done` (terminal) têm comportamento especial.

@@ -64,7 +64,7 @@ Worktrees paralelos convivem: o rebase do finish absorve o que entrou na `main` 
 
 ### Issue tracker
 
-Issues e specs deste repo vivem no GitHub Issues (`Sanmoo/my-tasks`); tickets anteriores à migração ficam em `.scratch/` como histórico. See `docs/agents/issue-tracker.md`.
+Issues e specs deste repo vivem no vault `myt` do próprio repo (`issues/` + `mt.yaml`, operados pelo CLI `mt`); tickets anteriores à migração ficam em `.scratch/` e issues do GitHub como histórico. Resolva o vault pelo prefixo do ID (`myt-…`) ou `@bookmark` — nunca pelo cwd; PRs continuam no GitHub. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

@@ -22,7 +22,7 @@ const NaiveLayout = "2006-01-02T15:04"
 //
 // Always present: title, status, labels, created_at. Present only when
 // they have a value: rank, deferred_until, deadline, started_at,
-// completed_at, blocked_by. There is no id (the file name is the
+// completed_at, claimed_by, blocked_by. There is no id (the file name is the
 // authority) and no updated_at (Git and mtime track that).
 type Frontmatter struct {
 	Title     string   `yaml:"title"`
@@ -35,6 +35,7 @@ type Frontmatter struct {
 	Deadline      string   `yaml:"deadline,omitempty"`
 	StartedAt     string   `yaml:"started_at,omitempty"`
 	CompletedAt   string   `yaml:"completed_at,omitempty"`
+	ClaimedBy     string   `yaml:"claimed_by,omitempty"`
 	BlockedBy     []string `yaml:"blocked_by,flow,omitempty"`
 }
 

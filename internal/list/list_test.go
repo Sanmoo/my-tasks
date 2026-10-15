@@ -156,6 +156,10 @@ func TestAvailable(t *testing.T) {
 		it.Issue.Frontmatter.BlockedBy = ids
 		return it
 	}
+	claimedBy := func(it issue.Item, who string) issue.Item {
+		it.Issue.Frontmatter.ClaimedBy = who
+		return it
+	}
 	cases := []struct {
 		name  string
 		items []issue.Item
@@ -239,6 +243,30 @@ func TestAvailable(t *testing.T) {
 			items: []issue.Item{
 				blockedBy(item("subject", "open", nil, "", ""), "ghost"),
 			},
+		},
+		{
+			name:  "a claimed open Issue is unavailable",
+			items: []issue.Item{claimedBy(item("claimed", "open", nil, "", ""), "pi-sessao-7")},
+		},
+		{
+			name: "a claim adds unavailability on top of open+free",
+			items: []issue.Item{
+				claimedBy(item("claimed", "open", nil, "", ""), "pi-sessao-7"),
+				item("free", "open", nil, "", ""),
+			},
+			want: []string{"free"},
+		},
+		{
+			name: "a claimed Issue with an expired deferral stays unavailable",
+			items: []issue.Item{claimedBy(item("claimed", "open", nil, "", "2026-08-10T08:00"), "pi-sessao-7")},
+		},
+		{
+			name: "claim and block compose",
+			items: []issue.Item{
+				item("blocker-open", "open", nil, "", ""),
+				blockedBy(claimedBy(item("subject", "open", nil, "", ""), "pi"), "blocker-open"),
+			},
+			want: []string{"blocker-open"},
 		},
 		{
 			name: "blocked and future-deferred is unavailable once",

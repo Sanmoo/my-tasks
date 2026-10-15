@@ -120,6 +120,8 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(newDeferCmd())
 	cmd.AddCommand(newUndeferCmd())
 	cmd.AddCommand(newDepCmd())
+	cmd.AddCommand(newClaimCmd())
+	cmd.AddCommand(newUnclaimCmd())
 	cmd.AddCommand(newPickNextCmd())
 	cmd.AddCommand(newPrioritizeCmd())
 	cmd.AddCommand(newTopCmd())

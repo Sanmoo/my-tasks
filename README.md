@@ -85,11 +85,12 @@ Resumo:
 | `mt show <id>` | mostra a Issue renderizada (header, metadados, corpo) |
 | `mt edit <id>` | abre a Issue no `$EDITOR` |
 | `mt done <id> [comentário]` (alias `close`) | fecha a Issue (carimba `completed_at`), anexando o comentário final |
-| `mt reopen <id> [comentário]` | reabre (limpa `completed_at` e `started_at`), anexando o comentário final |
+| `mt reopen <id> [comentário]` | reabre (limpa `completed_at`, `started_at` e o Claim), anexando o comentário final |
 | `mt status <id> <status> [comentário]` | transição livre de status, anexando o comentário final |
 | `mt defer <id> <quando>` | adia a Issue até uma data/hora |
 | `mt undefer [id]` | limpa `deferred_until` (todas as expiradas, ou uma Issue) |
 | `mt dep add <id> <bloqueador>` / `mt dep rm <id> <bloqueador>` | registra/remove dependência (`blocked_by`) |
+| `mt claim <id> <quem>` / `mt unclaim <id>` | grava/limpa `claimed_by` (posse antes de iniciar) |
 | `mt comment <id> <texto>` | anexa um comentário com timestamp (texto em branco é erro) |
 | `mt list` | lista na ordem de prioridade |
 | `mt ready` | lista as Issues disponíveis agora |
@@ -288,6 +289,34 @@ mt dep rm pkm-002 pkm-001
 - `mt check` valida as referências: existência no vault, sem auto-bloqueio,
   sem ciclos.
 
+### `mt claim <id> <quem>` | `mt unclaim <id>`
+
+Registra a posse de uma Issue no campo `claimed_by`: uma sessão assumiu o
+trabalho **antes** de iniciá-lo. Claim é campo, não status — a Issue mantém
+seu status — e claim ativo remove disponibilidade: `ready` não lista e
+`pick-next` puloa (ADR-0010). Não confundir com `in_progress`, que significa
+que o trabalho começou: claim é "assumida mas não iniciada".
+
+```sh
+mt claim pkm-055 pi-sessao-7
+# → pkm-055 claimed by pi-sessao-7
+
+mt unclaim pkm-055
+# → pkm-055 unclaimed
+```
+
+- só Issues `open` podem ser claimadas (claim é reserva, não início);
+  claimar `in_progress`/`done`/status customizado é erro de usuário (exit 1);
+- o `<quem>` é obrigatório (exit 2 sem ele) — é a única informação que o
+  campo existe para guardar; re-claimar sobrepõe (posse transferida à mão);
+- `unclaim` sem claim é erro de usuário (exit 1); funciona em qualquer
+  status, inclusive pra limpar claim residual numa Issue `done`;
+- Issues claimadas aparecem com sufixo `[claimed]` no `list` e mostram
+  `Claimed by:` no `show`;
+- `mt done` preserva o claim como histórico; `mt reopen` o limpa — reabrir
+  volta ao estado "ninguém pegou";
+- `mt check` recusa claim em branco (chamado a mão).
+
 ### `mt comment <id> <texto>`
 
 Anexa um comentário à seção `## Comments` da Issue: heading com timestamp,
@@ -344,8 +373,9 @@ e `?` para status customizados.
 
 ### `mt ready` e `mt overdue`
 
-- `ready` — as Issues `open` e disponíveis agora (`now >= deferred_until` e
-  nenhum bloqueador não-`done`), na ordem de prioridade de `list`;
+- `ready` — as Issues `open` e disponíveis agora (`now >= deferred_until`,
+  nenhum bloqueador não-`done` e sem Claim ativo), na ordem de prioridade
+  de `list`;
 - `overdue` — o comando de **atenção temporal**: primeiro as Issues com
   Deferral expirada (sufixo `[expirada MM-DD]`), depois as Issues não-`done`
   com `deadline` no passado (sufixo `[deadline MM-DD]`). Cada grupo segue a
@@ -360,9 +390,10 @@ Ambas respeitam o formato de linha de `list`; sem correspondências, a saída
 
 ### `mt pick-next`
 
-Inicia a próxima Issue disponível: a `open` de menor Rank; sem Issues
-rankeadas, a mais antiga do Backlog (desempate por ID). Adiadas para o
-futuro e bloqueadas (algum bloqueador não-`done`) são puladas. A Issue
+Inicia a próxima Issue disponível: a `open` de menor Rank; sem Issue
+rankeada, a mais antiga do Backlog (desempate por ID). Adiadas para o
+futuro, bloqueadas (algum bloqueador não-`done`) e com Claim ativo são
+puladas. A Issue
 escolhida vira `in_progress`, recebe `started_at` e a confirmação mostra o
 título (como em `status`/`done`):
 

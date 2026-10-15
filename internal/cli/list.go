@@ -84,6 +84,9 @@ func runList(cmd *cobra.Command, all bool, statusFilter string, labelFilters []s
 		if list.Blocked(it.Issue.Frontmatter.BlockedBy, statusByID) {
 			line += " [blocked]"
 		}
+		if it.Issue.Frontmatter.ClaimedBy != "" {
+			line += " [claimed]"
+		}
 		fmt.Fprintln(out, line)
 	}
 	return nil
@@ -134,7 +137,8 @@ const listLong = `list prints the vault's issues in priority order:
 
 Each line is a status glyph (○ open, ◐ in_progress, ● done, ? for a
 custom status), the ID, and the title. Issues blocked by another
-non-done Issue carry a [blocked] suffix. Only done issues are hidden
-by default; --all shows them too. Issues deferred to the future are
-always shown, marked with a [defer MM-DD HH:MM] suffix. Use --status
-and --label to narrow the view.`
+non-done Issue carry a [blocked] suffix; claimed issues carry a
+[claimed] suffix. Only done issues are hidden by default; --all shows
+them too. Issues deferred to the future are always shown, marked with
+a [defer MM-DD HH:MM] suffix. Use --status and --label to narrow the
+view.`

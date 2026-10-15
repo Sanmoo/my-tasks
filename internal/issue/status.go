@@ -15,12 +15,15 @@ func (i Issue) Done(now string) Issue {
 	return i
 }
 
-// Reopen returns i reopened: status "open" with completed_at and
-// started_at cleared. Every other field is untouched.
+// Reopen returns i reopened: status "open" with completed_at, started_at
+// and claimed_by cleared — reopening returns the Issue to the state
+// "nobody has it". Every other field is untouched; done preserves the
+// claim as history.
 func (i Issue) Reopen() Issue {
 	i.Frontmatter.Status = "open"
 	i.Frontmatter.CompletedAt = ""
 	i.Frontmatter.StartedAt = ""
+	i.Frontmatter.ClaimedBy = ""
 	return i
 }
 

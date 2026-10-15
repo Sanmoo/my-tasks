@@ -82,7 +82,7 @@ func TestValidateFrontmatter(t *testing.T) {
 		want string
 	}{
 		{"valid", validFile(), ""},
-		{"valid with blocked_by", []byte("---\ntitle: title\nstatus: open\nlabels: []\ncreated_at: 2026-01-01T10:00\nblocked_by: [pkm-001]\n---\nbody\n"), ""},
+		{"valid with blocked_by", []byte("---\ntitle: title\nstatus: open\nlabels: []\ncreated_at: 2026-01-01T10:00\nclaimed_by: pi-sessao-7\nblocked_by: [pkm-001]\n---\nbody\n"), ""},
 		{"empty blocked_by scalar is an empty optional field", []byte("---\ntitle: title\nstatus: open\nlabels: []\ncreated_at: 2026-01-01T10:00\nblocked_by:\n---\nbody\n"), "empty optional field"},
 		{"missing opening delimiter", []byte("title: title\n---\n"), "start with"},
 		{"missing closing delimiter", []byte("---\ntitle: title\n"), "not closed"},
@@ -118,6 +118,7 @@ func TestValidateItem(t *testing.T) {
 	base.Issue.Frontmatter.Deadline = "2026-01-03T10:00"
 	base.Issue.Frontmatter.StartedAt = "2026-01-04T10:00"
 	base.Issue.Frontmatter.CompletedAt = "2026-01-05T10:00"
+	base.Issue.Frontmatter.ClaimedBy = "pi-sessao-7"
 	if err := check.ValidateItem(base, statuses); err != nil {
 		t.Fatalf("ValidateItem(valid) = %v, want nil", err)
 	}
@@ -137,6 +138,7 @@ func TestValidateItem(t *testing.T) {
 		{"invalid deadline", func() issue.Item { x := base; x.Issue.Frontmatter.Deadline = "bad"; return x }(), "deadline"},
 		{"invalid started_at", func() issue.Item { x := base; x.Issue.Frontmatter.StartedAt = "bad"; return x }(), "started_at"},
 		{"invalid completed_at", func() issue.Item { x := base; x.Issue.Frontmatter.CompletedAt = "bad"; return x }(), "completed_at"},
+		{"blank claimed_by", func() issue.Item { x := base; x.Issue.Frontmatter.ClaimedBy = "   "; return x }(), "claimed_by"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -108,6 +108,26 @@ run dep rm "$ID1" nope
 run dep rm "$ID1"
 run dep rm "$ID1" "$ID2" extra
 
+label "claim"
+ID3=$("$MT" q "third issue")
+run claim
+run claim "$ID3"
+run claim "$ID3" "   "
+run claim nope who
+run claim "$ID3" who
+run claim "$ID3" who again
+run claim "$ID3" other
+run unclaim
+run unclaim nope
+run unclaim "$ID3" extra
+done_cmd=$("$MT" q "claimed done")
+run claim "$done_cmd" who
+run done "$done_cmd"
+run claim "$done_cmd" who
+run unclaim "$done_cmd"
+run unclaim "$ID3"
+run unclaim "$ID3"
+
 label "prioritize / rank"
 run prioritize
 run top "$ID1"

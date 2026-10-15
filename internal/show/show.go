@@ -152,6 +152,9 @@ func Render(i issue.Issue, id string, opts Options) string {
 	if fm.CompletedAt != "" {
 		meta(&b, "Completed", displayTime(fm.CompletedAt), opts.Color, dark)
 	}
+	if fm.ClaimedBy != "" {
+		meta(&b, "Claimed by", fm.ClaimedBy, opts.Color, dark)
+	}
 	if len(fm.BlockedBy) > 0 {
 		meta(&b, "Blocked by", strings.Join(fm.BlockedBy, ", "), opts.Color, dark)
 	}

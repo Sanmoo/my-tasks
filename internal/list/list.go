@@ -184,6 +184,18 @@ func DeferSuffix(deferredUntil string, now time.Time) string {
 	return "[defer " + t.Format("01-02 15:04") + "]"
 }
 
+// ClaimSuffix returns the "[claimed]" marker for an Issue with an active
+// claim (non-empty claimedBy). It returns "" for an unclaimed Issue. The
+// claim's value never appears in the one-line view — mt show owns the
+// full value; the marker only marks possession, historical (a claimed
+// done Issue, revealed by --all) or active alike.
+func ClaimSuffix(claimedBy string) string {
+	if claimedBy == "" {
+		return ""
+	}
+	return "[claimed]"
+}
+
 // StatusByID indexes items by their ID for the blocked lookup: the map
 // holds each item's status, and an ID with no issue is absent. The
 // caller builds it once per vault view and passes it to Blocked.

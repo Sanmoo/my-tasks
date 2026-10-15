@@ -84,8 +84,8 @@ func runList(cmd *cobra.Command, all bool, statusFilter string, labelFilters []s
 		if list.Blocked(it.Issue.Frontmatter.BlockedBy, statusByID) {
 			line += " [blocked]"
 		}
-		if it.Issue.Frontmatter.ClaimedBy != "" {
-			line += " [claimed]"
+		if suffix := list.ClaimSuffix(it.Issue.Frontmatter.ClaimedBy); suffix != "" {
+			line += " " + suffix
 		}
 		fmt.Fprintln(out, line)
 	}

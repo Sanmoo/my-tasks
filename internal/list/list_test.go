@@ -55,6 +55,24 @@ func ids(items []issue.Item) []string {
 	return out
 }
 
+func TestClaimSuffixMarksPossessionAndNothingElse(t *testing.T) {
+	cases := []struct {
+		name string
+		who  string
+		want string
+	}{
+		{"unclaimed is unmarked", "", ""},
+		{"a claimed issue is marked", "pi-sessao-7", "[claimed]"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := list.ClaimSuffix(c.who); got != c.want {
+				t.Errorf("ClaimSuffix(%q) = %q, want %q", c.who, got, c.want)
+			}
+		})
+	}
+}
+
 func TestSortOrdersByRankThenBacklogCreatedAtThenID(t *testing.T) {
 	r1, r2 := intPtr(1), intPtr(2)
 	items := []issue.Item{

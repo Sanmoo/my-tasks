@@ -197,6 +197,21 @@ Feature: Claim issues
     Then the exit code is 0
     And stdout contains "ciclo de vida do claim"
 
+  Scenario: a claimed done issue keeps the [claimed] marker as history under --all
+    When I run `mt create --vault <vault> "historico de posse"`
+    Then the exit code is 0
+    And I remember the issue ID
+    When I run `mt claim --vault <vault> <id> pi-sessao-7`
+    Then the exit code is 0
+    When I run `mt done --vault <vault> <id>`
+    Then the exit code is 0
+    When I run `mt list --vault <vault>`
+    Then the exit code is 0
+    And stdout does not contain "historico de posse"
+    When I run `mt list --vault <vault> --all`
+    Then the exit code is 0
+    And stdout contains "historico de posse [claimed]"
+
   Scenario: mt check rejects a blank claimed_by written by hand
     Given the file "<vault>/issues/pkm-001.md" is written with:
       """

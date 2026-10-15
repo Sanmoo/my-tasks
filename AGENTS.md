@@ -53,10 +53,11 @@ Quando o usuário sinalizar que a PR foi mergeada:
     git fetch origin
     git switch main
     git pull --ff-only origin main
+    git push origin --delete <slug>     # a branch não sobrevive ao merge — se o GitHub já a removeu, o comando falha benigno; siga
     git worktree remove .worktrees/<slug>
     git branch -D <slug>
 
-Se a PR foi mergeada por squash ou rebase, a tip não é ancestral da `main`: confirme a integração por conteúdo (sem diff entre a branch e a `main` atualizada) e só então use `git branch -D`. Com a PR ainda aberta ou o worktree sujo, preserve tudo e pergunte.
+A entrega só fica concluída sem branch residual, local ou remota — o `git push -u origin <slug>` do início criou a remota, e o delete acima é quem a recolhe quando o repositório não a auto-remove no merge. Se a PR foi mergeada por squash ou rebase, a tip não é ancestral da `main`: confirme a integração por conteúdo (sem diff entre a branch e a `main` atualizada) e só então use `git branch -D`. Com a PR ainda aberta ou o worktree sujo, preserve tudo e pergunte.
 
 Worktrees paralelos convivem: o rebase do finish absorve o que entrou na `main` enquanto isso. Confira o fim com `git worktree list`: o worktree deste ticket deve ter sumido; sem tickets paralelos, resta apenas o checkout principal.
 

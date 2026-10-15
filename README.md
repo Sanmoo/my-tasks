@@ -308,7 +308,9 @@ mt unclaim pkm-055
 - só Issues `open` podem ser claimadas (claim é reserva, não início);
   claimar `in_progress`/`done`/status customizado é erro de usuário (exit 1);
 - o `<quem>` é obrigatório (exit 2 sem ele) — é a única informação que o
-  campo existe para guardar; re-claimar sobrepõe (posse transferida à mão);
+  campo existe para guardar; pode ser multi-palavra (argumentos após o ID
+  são unidos com espaço simples, como o argumento de tempo do `defer`);
+  re-claimar sobrepõe (posse transferida à mão);
 - `unclaim` sem claim é erro de usuário (exit 1); funciona em qualquer
   status, inclusive pra limpar claim residual numa Issue `done`;
 - Issues claimadas aparecem com sufixo `[claimed]` no `list` e mostram

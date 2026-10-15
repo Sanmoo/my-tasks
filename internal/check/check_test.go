@@ -84,6 +84,7 @@ func TestValidateFrontmatter(t *testing.T) {
 		{"valid", validFile(), ""},
 		{"valid with blocked_by", []byte("---\ntitle: title\nstatus: open\nlabels: []\ncreated_at: 2026-01-01T10:00\nclaimed_by: pi-sessao-7\nblocked_by: [pkm-001]\n---\nbody\n"), ""},
 		{"empty blocked_by scalar is an empty optional field", []byte("---\ntitle: title\nstatus: open\nlabels: []\ncreated_at: 2026-01-01T10:00\nblocked_by:\n---\nbody\n"), "empty optional field"},
+		{"empty claimed_by string is an empty optional field", []byte("---\ntitle: title\nstatus: open\nlabels: []\ncreated_at: 2026-01-01T10:00\nclaimed_by: \"\"\n---\nbody\n"), "empty optional field"},
 		{"missing opening delimiter", []byte("title: title\n---\n"), "start with"},
 		{"missing closing delimiter", []byte("---\ntitle: title\n"), "not closed"},
 		{"malformed YAML", []byte("---\nlabels: [unclosed\n---\n"), "malformed frontmatter"},

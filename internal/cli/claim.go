@@ -124,7 +124,9 @@ Only an open Issue can be claimed (claim is a reservation, not a
 start); the claim removes availability, so ready and pick-next skip
 the Issue until mt unclaim clears it, mt reopen wipes it, or mt done
 archives it as history. Claiming an already-claimed Issue overwrites
-the claim: possession can be transferred explicitly.`
+the claim: possession can be transferred explicitly. The claimer may
+be spelled multi-word; the arguments after the ID are joined with
+single spaces (like defer's time argument).`
 
 const unclaimLong = `unclaim clears an Issue's claimed_by field: the Issue is back in
 normal circulation immediately. Unclaiming an Issue with no claim is a

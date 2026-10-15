@@ -75,3 +75,6 @@ Um campo de frontmatter opcional `claimed_by` (string) no Issue, com dois comand
 
 ## Notes
 ## Comments
+### 2026-10-15T11:05
+Implementado (commits 1492406..b4cbdc8): campo claimed_by, mt claim/unclaim, Disponibilidade com claim, [claimed] no list, Claimed by no show, check de claim em branco, ADR-0010, e2e claim.feature (14 cenários), README. Reviewer dual (standards+spec) sem blockers. PR #17 aguardando merge.
+<!-- comment: f3762605 -->

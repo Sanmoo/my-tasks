@@ -16,26 +16,19 @@ import (
 	"github.com/Sanmoo/my-tasks2/internal/issue"
 )
 
-// recoveryDirName is the directory, inside the Vault and beside issues/,
-// that keeps the originals of a rank operation until it is known to be
-// complete. It is never listed: every listing reads issues/ only.
+// recoveryDirName keeps the originals of a rank operation beside issues/,
+// never listed as Issues.
 const recoveryDirName = ".mt-recovery"
 
-// RankPlan is one planned Rank operation: the Rank changes of existing
-// Issues and, optionally, the Issue the operation creates. The Changes
-// are the caller's computed intent (issue.Change); this package decides
-// nothing about order or position — it persists them as one operation.
+// RankPlan is one planned Rank operation: the caller's computed Rank
+// changes and, optionally, the Issue it creates. This package persists
+// them as one recoverable operation; it decides nothing about order.
 type RankPlan struct {
-	// Changes are applied in order. An Issue that appears in no change is
-	// never written.
 	Changes []issue.Change
-	// Create, when set, is the Issue written after the Changes. Its ID is
-	// allocated while the plan is prepared.
-	Create *NewIssue
+	Create  *NewIssue
 }
 
-// NewIssue describes the Issue a RankPlan creates. Prefix and Rand feed
-// issue.NextID; Issue is written as it is, with its final Rank.
+// NewIssue describes the Issue a RankPlan creates.
 type NewIssue struct {
 	Prefix string
 	Issue  issue.Issue
@@ -43,27 +36,12 @@ type NewIssue struct {
 }
 
 // ApplyRankPlan persists plan as one recoverable operation and returns the
-// ID of the Issue it created ("" when it creates none).
-//
-// The plan is prepared in full before the first write: every target is
-// validated as a regular file, its original bytes and permission bits
-// are read, and the bytes it intends to write are rendered. A failure
-// there leaves every Issue untouched. When the plan changes existing
-// Issues, their originals are then copied to <Vault>/.mt-recovery/<op>/.
-//
-// The Issues are written in order. When a write fails, every Issue whose
-// write was attempted — the one that failed included, since a failed
-// write may already have changed it — is restored to its original bytes
-// and permissions, and the Issue created by the plan, if this call
-// created it, is removed. When that restoration completes, nothing of
-// the operation remains and the error says the previous state was
-// restored. When it does not complete, the error is a *RecoveryError: it
-// names the Issues still pending and the absolute path of the originals
-// kept for manual recovery. Nothing is recovered automatically later.
-//
-// A plan with no change and no creation writes nothing and creates no
-// recovery artefact. The contract assumes no other writer of the Vault
-// while the operation runs; it does not survive an abrupt termination.
+// ID of the Issue it created ("" when it creates none). See
+// docs/adr/0011-rank-application-is-recoverable.md for the contract:
+// prepare in full before the first write, keep the originals in
+// <Vault>/.mt-recovery/<op>/, roll back every attempted write on failure
+// and report an incomplete restoration with the pending Issues and the
+// absolute path of their originals. An empty plan writes nothing.
 func (s Store) ApplyRankPlan(plan RankPlan) (string, error) {
 	writes, err := s.prepareWrites(plan.Changes)
 	if err != nil {
@@ -99,9 +77,8 @@ func (s Store) ApplyRankPlan(plan RankPlan) (string, error) {
 	return id, nil
 }
 
-// rankWrite is one prepared Rank change: the Issue, the bytes it had, its
-// permission bits, and the bytes the plan writes. attempted records that
-// the write was started, which is when the file may have changed.
+// rankWrite is one prepared Rank change; attempted records that the write
+// was started, which is when the file may have changed.
 type rankWrite struct {
 	id        string
 	perm      fs.FileMode
@@ -110,8 +87,8 @@ type rankWrite struct {
 	attempted bool
 }
 
-// createTarget is the prepared Issue of a plan: its allocated ID and the
-// bytes to write. created is set only when this operation made the file.
+// createTarget is the prepared Issue of a plan; created is set only when
+// this operation made the file.
 type createTarget struct {
 	id      string
 	data    []byte
@@ -119,9 +96,7 @@ type createTarget struct {
 }
 
 // MissingIssueError reports a plan whose target Issue is not in the Vault.
-// Absence is still a wrapped os.ErrNotExist, so a caller can keep testing
-// errors.Is; the typed error carries the ID for the not-found message the
-// command layer renders.
+// It still wraps os.ErrNotExist; the ID feeds the not-found message.
 type MissingIssueError struct {
 	ID  string
 	Err error
@@ -129,13 +104,11 @@ type MissingIssueError struct {
 
 func (e *MissingIssueError) Error() string { return e.Err.Error() }
 
-// Unwrap returns the absence error (a wrapped os.ErrNotExist).
 func (e *MissingIssueError) Unwrap() error { return e.Err }
 
-// prepareWrites validates and renders every Rank change without touching
-// the disk beyond reads. It refuses a malformed or duplicated ID, a
-// missing or non-regular target and an unparsable Issue — so each such
-// failure happens before the first write.
+// prepareWrites validates and renders every Rank change without writing:
+// a malformed or duplicated ID, a missing or non-regular target and an
+// unparsable Issue all fail before the first write.
 func (s Store) prepareWrites(changes []issue.Change) ([]*rankWrite, error) {
 	writes := make([]*rankWrite, 0, len(changes))
 	planned := make(map[string]bool, len(changes))
@@ -155,8 +128,7 @@ func (s Store) prepareWrites(changes []issue.Change) ([]*rankWrite, error) {
 			return nil, err
 		}
 		if sameRank(item.Issue.Frontmatter.Rank, ch.Rank) {
-			// An Issue whose Rank does not change is never rewritten.
-			continue
+			continue // an Issue whose Rank does not change is never rewritten
 		}
 		item.Issue.Frontmatter.Rank = ch.Rank
 		next, err := issue.Render(item.Issue)
@@ -168,8 +140,8 @@ func (s Store) prepareWrites(changes []issue.Change) ([]*rankWrite, error) {
 	return writes, nil
 }
 
-// prepareCreate allocates the ID of the Issue the plan creates and renders
-// it. The ID avoids every name the Vault uses, symlinks included.
+// prepareCreate allocates the created Issue's ID (avoiding every taken
+// name, symlinks included) and renders it.
 func (s Store) prepareCreate(n NewIssue) (*createTarget, error) {
 	taken, err := s.takenIDs()
 	if err != nil {
@@ -189,9 +161,9 @@ func (s Store) prepareCreate(n NewIssue) (*createTarget, error) {
 	return &createTarget{id: id, data: data}, nil
 }
 
-// keepOriginals creates the operation's recovery directory and copies the
-// original of every Issue the plan will write into it. If that fails, the
-// directory is removed again: no Issue has been touched yet.
+// keepOriginals copies the original of every planned write into a fresh
+// recovery directory; on failure the directory is removed again, before
+// any Issue was touched.
 func (s Store) keepOriginals(writes []*rankWrite) (string, error) {
 	dir, err := s.newRecoveryDir()
 	if err != nil {
@@ -209,9 +181,9 @@ func (s Store) keepOriginals(writes []*rankWrite) (string, error) {
 }
 
 // newRecoveryDir creates <Vault>/.mt-recovery/<op>/ and returns its
-// absolute path. The name carries a UTC instant and random bytes so two
-// operations never share a directory. An existing .mt-recovery that is
-// not a real directory (a file or a symlink) is refused, never followed.
+// absolute path. The name carries a UTC instant and random bytes, so two
+// operations never share a directory. A .mt-recovery that is not a real
+// directory is refused, never followed.
 func (s Store) newRecoveryDir() (string, error) {
 	base, err := filepath.Abs(s.dir)
 	if err != nil {
@@ -241,9 +213,8 @@ func (s Store) newRecoveryDir() (string, error) {
 	return dir, nil
 }
 
-// writeOriginal stores the original bytes of one Issue at path, with the
-// Issue's permission bits. O_EXCL keeps an existing copy from being
-// overwritten.
+// writeOriginal stores one Issue's original bytes and permission bits;
+// O_EXCL never overwrites a copy.
 func writeOriginal(path string, w *rankWrite) error {
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
@@ -258,10 +229,8 @@ func writeOriginal(path string, w *rankWrite) error {
 	return nil
 }
 
-// apply writes the prepared plan in order: the Rank changes first, then
-// the created Issue. Each write is attempted before it starts, so a
-// failure at any point leaves every touched file in the attempted set.
-// The inject calls are the package's fault seam (see fault.go).
+// apply writes the prepared plan in order: changes first, then the created
+// Issue. The inject calls are the fault seam (fault.go).
 func (s Store) apply(writes []*rankWrite, create *createTarget) error {
 	for _, w := range writes {
 		w.attempted = true
@@ -291,11 +260,9 @@ func (s Store) apply(writes []*rankWrite, create *createTarget) error {
 	return nil
 }
 
-// rollback restores the state the operation found after applyErr. It
-// tries every attempted Issue and the created one, even when some fail,
-// and reports what it could not restore. Originals are kept whenever
-// something is pending; a complete restoration removes the recovery
-// directory.
+// rollback restores the state the operation found after applyErr — every
+// attempted Issue and the created one, even when some restorations fail —
+// and reports what it could not bring back.
 func (s Store) rollback(applyErr error, writes []*rankWrite, create *createTarget, dir string) error {
 	pending := s.restore(writes, create, dir)
 	if len(pending) == 0 {
@@ -319,14 +286,14 @@ func (s Store) rollback(applyErr error, writes []*rankWrite, create *createTarge
 		}
 	}
 	if keep == "" && dir != "" {
-		// Only a removal is pending: no original is left to keep.
+		// Only a removal is pending: no original to keep.
 		_ = removeRecovery(dir)
 	}
 	return &RecoveryError{Cause: applyErr, Dir: keep, Pending: pending}
 }
 
 // touched reports whether the operation attempted any write or created a
-// file: only then does a failure have a state to restore.
+// file — only then does a failure have a state to restore.
 func touched(writes []*rankWrite, create *createTarget) bool {
 	for _, w := range writes {
 		if w.attempted {
@@ -344,10 +311,8 @@ func sameRank(a, b *int) bool {
 	return *a == *b
 }
 
-// restore brings back every attempted Issue from its original bytes and
-// removes the created Issue when this operation made it. It returns what
-// it could not restore. The copy of an Issue restored successfully is
-// removed on the way; copies of pending Issues stay in dir.
+// restore brings back every attempted Issue and removes the created one
+// when this operation made it, returning what it could not restore.
 func (s Store) restore(writes []*rankWrite, create *createTarget, dir string) []Pending {
 	var pending []Pending
 	for _, w := range writes {
@@ -362,11 +327,8 @@ func (s Store) restore(writes []*rankWrite, create *createTarget, dir string) []
 			pending = append(pending, Pending{ID: w.id, Original: original, Err: err})
 			continue
 		}
-		if original != "" {
-			// Best effort: a copy that survives is still a correct
-			// original, and a complete restoration removes the directory.
-			_ = os.Remove(original)
-		}
+		// Best effort: a complete restoration removes the directory.
+		_ = os.Remove(original)
 	}
 	if create != nil && create.created {
 		if err := os.Remove(s.path(create.id)); err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -376,10 +338,9 @@ func (s Store) restore(writes []*rankWrite, create *createTarget, dir string) []
 	return pending
 }
 
-// restoreFile writes the original bytes back into an Issue and sets its
-// permission bits. The file must still be a regular file, and the open
-// refuses a symlink. A read-only Issue is opened for the owner's write
-// access only for the restoration, and its mode is set back afterwards.
+// restoreFile writes the original bytes and permission bits back into an
+// Issue. The open refuses a symlink; a read-only Issue is opened with the
+// owner's write access only for the restoration, and its mode is set back.
 func (s Store) restoreFile(w *rankWrite) error {
 	if err := inject(stageRestore, w.id); err != nil {
 		return err
@@ -416,9 +377,8 @@ func discardRecovery(dir string, cause error) error {
 	return cause
 }
 
-// removeRecovery deletes an operation's recovery directory and, when it
-// was the last one, the .mt-recovery directory beside it. A parent that
-// still holds another operation is expected, not a failure.
+// removeRecovery deletes an operation's directory and .mt-recovery with it
+// when that was the last one; a parent holding another operation is fine.
 func removeRecovery(dir string) error {
 	if err := os.RemoveAll(dir); err != nil {
 		return err
@@ -430,7 +390,6 @@ func removeRecovery(dir string) error {
 	return nil
 }
 
-// firstErr returns the first non-nil error, or nil.
 func firstErr(errs ...error) error {
 	for _, err := range errs {
 		if err != nil {
@@ -440,10 +399,9 @@ func firstErr(errs ...error) error {
 	return nil
 }
 
-// Pending is one Issue a restoration could not bring back. A restored Issue
-// is named by its original bytes (Original, an absolute path); an Issue
-// the operation created and could not remove has Created set and no
-// original, because there was none.
+// Pending is one Issue a restoration could not bring back: an Original
+// (an absolute path) for a restored-in-name Issue, Created for one the
+// operation made and could not remove — there was no original.
 type Pending struct {
 	ID       string
 	Created  bool
@@ -452,13 +410,10 @@ type Pending struct {
 }
 
 // RecoveryError reports a rank operation whose application failed and
-// whose restoration did not complete. Cause is the error that stopped the
-// application. Pending lists the Issues the restoration could not bring
-// back, and Dir is the absolute path of the directory that keeps their
-// originals. The Vault may hold an intermediate state; the operation has
-// not succeeded and is not recovered. Cleanup, when set, reports a
-// restoration that completed while its recovery directory could not be
-// removed. Exit code 1 — it is an operational failure, not a usage one.
+// whose restoration did not complete (exit code 1): the Vault may hold an
+// intermediate state. Pending names the Issues still owed, Dir the
+// absolute path of their originals; Cleanup, when set, reports a
+// restoration that completed while its directory could not be removed.
 type RecoveryError struct {
 	Cause   error
 	Dir     string
@@ -487,11 +442,10 @@ func (e *RecoveryError) Error() string {
 	return b.String()
 }
 
-// Unwrap returns the error that stopped the application.
 func (e *RecoveryError) Unwrap() error { return e.Cause }
 
-// CleanupError reports an operation that was applied — the Issues carry the
-// new state — whose recovery directory could not be removed.
+// CleanupError reports an operation that was applied — the Issues carry
+// the new state — whose recovery directory could not be removed.
 type CleanupError struct {
 	Dir string
 	Err error
@@ -501,5 +455,4 @@ func (e *CleanupError) Error() string {
 	return fmt.Sprintf("rank change applied, but the recovery directory %s could not be removed: %v", e.Dir, e.Err)
 }
 
-// Unwrap returns the removal error.
 func (e *CleanupError) Unwrap() error { return e.Err }

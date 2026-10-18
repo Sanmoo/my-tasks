@@ -115,16 +115,10 @@ func writeBuffer(buffer string) (string, error) {
 	return path, nil
 }
 
-// applyRankChanges applies the whole planned set of Rank changes in-process,
-// as one recoverable operation of the store: the plan is prepared in full
-// before the first write, a failure after it is rolled back to the previous
-// bytes and permissions, and a restoration that does not complete is an
-// operational error naming the pending Issues and where their originals are
-// kept. Every rank command funnels through it — mt prioritize, mt check
-// --fix, the quick-order commands (rank/top/bottom/unrank), mt place and
-// create/q's --top/--bottom — so the recovery contract cannot be forgotten
-// in one of them. A missing Issue (a Vault that changed underneath the
-// command) produces the same not-found error the rank paths always produced.
+// applyRankChanges applies the whole planned set of Rank changes as one
+// recoverable operation of the store (ADR-0011). Every rank command
+// funnels through it. A missing Issue maps to the not-found error the
+// rank paths always produced.
 func applyRankChanges(vaultDir string, changes []issue.Change) error {
 	_, err := issuefiles.Open(vaultDir).ApplyRankPlan(issuefiles.RankPlan{Changes: changes})
 	var missing *issuefiles.MissingIssueError

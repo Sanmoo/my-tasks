@@ -156,13 +156,9 @@ func placementAction(top, bottom bool) *priority.QuickAction {
 // runCreate writes a new Issue with title and labels and prints its ID
 // (just the ID when quiet, a confirmation line otherwise). With a
 // placement action the creation and the displaced ranks are one
-// recoverable operation: the quick-order plan — the same one behind `mt
-// top`/`mt bottom` — computes the newcomer's rank and the shifts of the
-// Issues it displaces before anything is written, and the store applies
-// the whole plan together, so a failure restores the neighbors and
-// removes the Issue this call created. Otherwise place carries the
-// implicit Encaixe session: the Issue is written first (the capture must
-// not depend on the questions) and the rank it converges to is applied
+// recoverable RankPlan (ADR-0011). Otherwise place carries the implicit
+// Encaixe session: the Issue is written first (the capture must not
+// depend on the questions) and the rank it converges to is applied
 // afterwards.
 func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, placement *priority.QuickAction, place placeRequest) error {
 	vaultDir, err := resolveVault(cmd)
@@ -198,11 +194,9 @@ func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, pl
 			return err
 		}
 		newIssue.Frontmatter.Rank = &rank
-		// One operation for the shifts and the newcomer: the displaced
-		// Issues are written before the new file lands, so the rank the
-		// new Issue takes (e.g. 1) is never duplicated on disk by the
-		// Issue it displaces — and a failure anywhere restores all of
-		// them, removing the new file only when this call created it.
+		// One operation for the shifts and the newcomer: the rank the
+		// new Issue takes (e.g. 1) is never duplicated on disk, and a
+		// failure restores all of them, removing only the created file.
 		id, err = issuefiles.Open(vaultDir).ApplyRankPlan(issuefiles.RankPlan{
 			Changes: others,
 			Create:  &issuefiles.NewIssue{Prefix: vcfg.Prefix, Issue: newIssue, Rand: rand.Reader},
@@ -232,16 +226,10 @@ func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, pl
 
 // planCreatePlacement computes where a new Issue enters the queue when
 // created with --top/--bottom, before its file exists: it reuses the
-// quick-order plan (the same single source of truth as `mt top`/`mt
-// bottom`) over the Vault as it is now plus a synthetic unranked item
-// standing in for the newcomer. The newcomer needs an identity in the
-// plan, but its real ID is allocated only by the store's operation; the
-// placeholder comes from the Vault prefix, never collides with an ID
-// already loaded, and never reaches disk or output. The function returns
-// the new Issue's rank and the rank changes of the Issues it displaces;
-// the caller hands both to the store as one RankPlan — shifts first, then
-// the creation — so the rank the newcomer takes is never duplicated on
-// disk and a planning failure leaves nothing behind.
+// quick-order plan over the Vault plus a synthetic unranked item standing
+// in for the newcomer (its real ID is allocated only by the store; the
+// placeholder never reaches disk or output). It returns the newcomer's
+// rank and the rank changes of the Issues it displaces, for one RankPlan.
 func planCreatePlacement(prefix string, items []issue.Item, action priority.QuickAction) (int, []issue.Change, error) {
 	placeholder := syntheticIssueID(prefix, items)
 	changes, err := priority.QuickPlan(append(items, issue.Item{

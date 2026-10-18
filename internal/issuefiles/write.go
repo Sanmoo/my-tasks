@@ -50,23 +50,17 @@ func (s Store) Edit(id string, edit func(path string) error) error {
 }
 
 // Create allocates a fresh ID for prefix, renders i and writes it as a
-// new file. It is a RankPlan with no Rank change: the same operation as
-// every other write, so a failed creation leaves no file behind. Every
-// *.md entry that is not a directory counts as occupied — symlinks
-// included — so a new Issue never takes a name the Vault already uses
-// and never writes through a link; O_CREATE|O_EXCL plus O_NOFOLLOW on
-// the open is the belt to that suspenders. The caller supplies the
-// randomness (rng) and the prefix (from the Vault config it already
-// loaded).
+// new file — a RankPlan with no Rank change, so a failed creation leaves
+// no file behind. Names taken by any non-directory entry (symlinks
+// included) are never chosen, and O_CREATE|O_EXCL plus O_NOFOLLOW on the
+// open is the belt to that suspenders.
 func (s Store) Create(prefix string, i issue.Issue, rng io.Reader) (string, error) {
 	return s.ApplyRankPlan(RankPlan{Create: &NewIssue{Prefix: prefix, Issue: i, Rand: rng}})
 }
 
 // takenIDs maps every Issue ID that Create must not reuse: every *.md
-// entry that is not a directory, symlinks included. This preserves the
-// long-standing allocation semantics of the CLI — a name occupied by a
-// link is never chosen — and it is what keeps Create away from a
-// symlink.
+// entry that is not a directory, symlinks included — a name occupied by
+// a link is never chosen.
 func (s Store) takenIDs() (map[string]bool, error) {
 	entries, err := s.scanIssues()
 	if err != nil {
@@ -105,11 +99,9 @@ func (s Store) writeBytes(id string, data []byte) error {
 	return nil
 }
 
-// createBytes writes a brand-new Issue file. O_EXCL never truncates an
-// existing file and never follows a symlink, so the worst case of a
-// name slipped in after the scan is a loud failure, not a write outside
-// the Vault. created reports whether this call made the file: only then
-// may a rollback remove it, never an entry that was already there.
+// createBytes writes a brand-new Issue file; O_EXCL never truncates or
+// follows a symlink. created reports whether this call made the file —
+// only then may a rollback remove it.
 func (s Store) createBytes(id string, data []byte) (created bool, err error) {
 	f, err := os.OpenFile(s.path(id), os.O_WRONLY|os.O_CREATE|os.O_EXCL|issueOpenNoFollow, 0o644)
 	if err != nil {

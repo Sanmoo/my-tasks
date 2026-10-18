@@ -107,11 +107,9 @@ func (s Store) readEntry(entry issueEntry) (issue.Item, []byte, bool, error) {
 	return issue.Item{ID: entry.id, Issue: i}, data, true, nil
 }
 
-// readBytes reads an Issue file whose path the caller already validated
-// as a regular file — a targeted read validates with regularPerm, a
-// listing read relies on the scan's classification. The open carries
-// O_NOFOLLOW, so a symlink swapped in between the validation and the
-// open still cannot redirect the read outside the Vault.
+// readBytes reads an Issue file already validated as a regular file;
+// O_NOFOLLOW keeps a symlink swapped in after the check from redirecting
+// the read outside the Vault.
 func (s Store) readBytes(id string) ([]byte, error) {
 	f, err := os.OpenFile(s.path(id), os.O_RDONLY|issueOpenNoFollow, 0)
 	if err != nil {
@@ -138,10 +136,9 @@ func (s Store) Read(id string) (issue.Item, error) {
 	return item, err
 }
 
-// load is the targeted read every operation shares: it validates the ID,
-// refuses anything but a regular file, and parses the bytes. It returns
-// the Item, the raw bytes and the permission bits of the file, so a
-// rank operation can keep the original it may have to restore.
+// load is the targeted read every operation shares: it returns the
+// Item, the raw bytes and the permission bits, so a rank operation can
+// keep the original it may have to restore.
 func (s Store) load(id string) (issue.Item, []byte, fs.FileMode, error) {
 	if err := checkID(id); err != nil {
 		return issue.Item{}, nil, 0, err
@@ -156,8 +153,7 @@ func (s Store) load(id string) (issue.Item, []byte, fs.FileMode, error) {
 			return issue.Item{}, nil, 0, err
 		}
 		// The command layer has always reported read failures as
-		// "reading issue <id>: ..."; the wrap keeps that shape so the
-		// output of a Vault without symlinks does not change.
+		// "reading issue <id>: ..."; the wrap keeps that shape.
 		return issue.Item{}, nil, 0, fmt.Errorf("reading issue %s: %w", id, err)
 	}
 	i, err := issue.Parse(data)

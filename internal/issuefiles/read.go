@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 
 	"github.com/Sanmoo/my-tasks2/internal/issue"
@@ -107,7 +108,7 @@ func (s Store) readEntry(entry issueEntry) (issue.Item, []byte, bool, error) {
 }
 
 // readBytes reads an Issue file whose path the caller already validated
-// as a regular file — a targeted read validates with checkRegular, a
+// as a regular file — a targeted read validates with regularPerm, a
 // listing read relies on the scan's classification. The open carries
 // O_NOFOLLOW, so a symlink swapped in between the validation and the
 // open still cannot redirect the read outside the Vault.
@@ -127,39 +128,41 @@ func (s Store) readBytes(id string) ([]byte, error) {
 	return data, nil
 }
 
-// readValidated reads the Issue file of a targeted operation: it
-// validates first that the path is a regular file — Lstat never follows
-// a symlink, so a link is refused with NotRegularError instead of read
-// — and then reads it.
-func (s Store) readValidated(id string) ([]byte, error) {
-	if err := s.checkRegular(id); err != nil {
-		return nil, err
-	}
-	return s.readBytes(id)
-}
-
 // Read returns the Issue with the given ID. The ID must be a single
 // path component and the file a regular one: a symlink is refused with
 // NotRegularError, never followed. Absence is a wrapped os.ErrNotExist
 // so the command layer can keep rendering its own not-found message
 // with the Vault context.
 func (s Store) Read(id string) (issue.Item, error) {
+	item, _, _, err := s.load(id)
+	return item, err
+}
+
+// load is the targeted read every operation shares: it validates the ID,
+// refuses anything but a regular file, and parses the bytes. It returns
+// the Item, the raw bytes and the permission bits of the file, so a
+// rank operation can keep the original it may have to restore.
+func (s Store) load(id string) (issue.Item, []byte, fs.FileMode, error) {
 	if err := checkID(id); err != nil {
-		return issue.Item{}, err
+		return issue.Item{}, nil, 0, err
 	}
-	data, err := s.readValidated(id)
+	perm, err := s.regularPerm(id)
+	var data []byte
+	if err == nil {
+		data, err = s.readBytes(id)
+	}
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return issue.Item{}, err
+			return issue.Item{}, nil, 0, err
 		}
 		// The command layer has always reported read failures as
 		// "reading issue <id>: ..."; the wrap keeps that shape so the
 		// output of a Vault without symlinks does not change.
-		return issue.Item{}, fmt.Errorf("reading issue %s: %w", id, err)
+		return issue.Item{}, nil, 0, fmt.Errorf("reading issue %s: %w", id, err)
 	}
 	i, err := issue.Parse(data)
 	if err != nil {
-		return issue.Item{}, fmt.Errorf("parsing issue %s: %w", id, err)
+		return issue.Item{}, nil, 0, fmt.Errorf("parsing issue %s: %w", id, err)
 	}
-	return issue.Item{ID: id, Issue: i}, nil
+	return issue.Item{ID: id, Issue: i}, data, perm, nil
 }

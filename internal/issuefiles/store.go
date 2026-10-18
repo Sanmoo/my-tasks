@@ -1,5 +1,10 @@
 // Package issuefiles is the single owner of the Issue files of a Vault:
-// listing, reading, writing, editing and creating them. It is Seam 2 —
+// listing, reading, writing, editing and creating them, and applying a
+// planned set of Rank changes as one recoverable operation (ApplyRankPlan:
+// prepare in full, keep the originals in <Vault>/.mt-recovery/<op>/, roll
+// back what was attempted on failure, report an incomplete restoration
+// with the pending Issues and the absolute path of their originals — see
+// docs/adr/0011-rank-application-is-recoverable.md). It is Seam 2 —
 // pure logic, black-box tested against t.TempDir() vaults, with the
 // coverage and mutation gates.
 //
@@ -32,6 +37,7 @@ package issuefiles
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -188,12 +194,19 @@ func kindOf(entry os.DirEntry) entryKind {
 // following symlinks: Lstat sees a symlink for what it is, and anything
 // that is not a regular file is refused with NotRegularError.
 func (s Store) checkRegular(id string) error {
+	_, err := s.regularPerm(id)
+	return err
+}
+
+// regularPerm is checkRegular that also reports the permission bits of
+// the file — the part of its mode a restoration brings back.
+func (s Store) regularPerm(id string) (fs.FileMode, error) {
 	info, err := os.Lstat(s.path(id))
 	if err != nil {
-		return fmt.Errorf("checking issue %s: %w", id, err)
+		return 0, fmt.Errorf("checking issue %s: %w", id, err)
 	}
 	if !info.Mode().IsRegular() {
-		return &NotRegularError{ID: id}
+		return 0, &NotRegularError{ID: id}
 	}
-	return nil
+	return info.Mode().Perm(), nil
 }

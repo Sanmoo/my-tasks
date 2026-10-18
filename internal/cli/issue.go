@@ -155,13 +155,15 @@ func placementAction(top, bottom bool) *priority.QuickAction {
 
 // runCreate writes a new Issue with title and labels and prints its ID
 // (just the ID when quiet, a confirmation line otherwise). With a
-// placement action the new Issue is created already in the queue: the
-// quick-order plan — the same one behind `mt top`/`mt bottom` — computes
-// its rank and the shifts of the Issues it displaces before anything is
-// written, so a planning or displaced-write failure leaves no stray
-// Issue behind. Otherwise place carries the implicit Encaixe session:
-// the Issue is written first (the capture must not depend on the
-// questions) and the rank it converges to is applied afterwards.
+// placement action the creation and the displaced ranks are one
+// recoverable operation: the quick-order plan — the same one behind `mt
+// top`/`mt bottom` — computes the newcomer's rank and the shifts of the
+// Issues it displaces before anything is written, and the store applies
+// the whole plan together, so a failure restores the neighbors and
+// removes the Issue this call created. Otherwise place carries the
+// implicit Encaixe session: the Issue is written first (the capture must
+// not depend on the questions) and the rank it converges to is applied
+// afterwards.
 func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, placement *priority.QuickAction, place placeRequest) error {
 	vaultDir, err := resolveVault(cmd)
 	if err != nil {
@@ -184,6 +186,7 @@ func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, pl
 		Body: issue.DefaultBody,
 	}
 	rank := 0
+	id := ""
 	if placement != nil {
 		items, err := loadItems(vaultDir)
 		if err != nil {
@@ -194,15 +197,19 @@ func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, pl
 		if err != nil {
 			return err
 		}
-		// The displaced Issues are rewritten before the new file lands, so
-		// the rank the new Issue takes (e.g. 1) is never duplicated on disk
-		// by the Issue it displaces.
-		if err := applyRankChanges(vaultDir, others); err != nil {
-			return err
-		}
 		newIssue.Frontmatter.Rank = &rank
+		// One operation for the shifts and the newcomer: the displaced
+		// Issues are written before the new file lands, so the rank the
+		// new Issue takes (e.g. 1) is never duplicated on disk by the
+		// Issue it displaces — and a failure anywhere restores all of
+		// them, removing the new file only when this call created it.
+		id, err = issuefiles.Open(vaultDir).ApplyRankPlan(issuefiles.RankPlan{
+			Changes: others,
+			Create:  &issuefiles.NewIssue{Prefix: vcfg.Prefix, Issue: newIssue, Rand: rand.Reader},
+		})
+	} else {
+		id, err = issuefiles.Open(vaultDir).Create(vcfg.Prefix, newIssue, rand.Reader)
 	}
-	id, err := issuefiles.Open(vaultDir).Create(vcfg.Prefix, newIssue, rand.Reader)
 	if err != nil {
 		return err
 	}
@@ -228,13 +235,13 @@ func runCreate(cmd *cobra.Command, title string, labels []string, quiet bool, pl
 // quick-order plan (the same single source of truth as `mt top`/`mt
 // bottom`) over the Vault as it is now plus a synthetic unranked item
 // standing in for the newcomer. The newcomer needs an identity in the
-// plan, but its real ID is allocated only by the store's Create; the
+// plan, but its real ID is allocated only by the store's operation; the
 // placeholder comes from the Vault prefix, never collides with an ID
 // already loaded, and never reaches disk or output. The function returns
 // the new Issue's rank and the rank changes of the Issues it displaces;
-// the caller applies the displaced changes first and creates the new
-// Issue with its final rank, so the rank it takes is never duplicated on
-// disk and a planning failure leaves no stray Issue behind.
+// the caller hands both to the store as one RankPlan — shifts first, then
+// the creation — so the rank the newcomer takes is never duplicated on
+// disk and a planning failure leaves nothing behind.
 func planCreatePlacement(prefix string, items []issue.Item, action priority.QuickAction) (int, []issue.Change, error) {
 	placeholder := syntheticIssueID(prefix, items)
 	changes, err := priority.QuickPlan(append(items, issue.Item{

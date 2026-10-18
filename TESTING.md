@@ -20,6 +20,18 @@ Two seams, agreed in the spec (.scratch/mt-tracker/spec.md, Testing Decisions):
 No tests reach unexported symbols or assert internal structure. The Cobra
 command wiring has no unit coverage gate — e2e behavior covers it.
 
+The one exception that proves the rule is `internal/issuefiles`' **fault
+seam**: the recoverable application of a Rank plan (ADR-0011) needs
+failures induced at exact points of the write/restore sequence — a file
+permission cannot express "fail the second write after the first
+succeeded". The hook lives inside the package (`fault.go`), is nil in
+production and is exposed to tests only via `export_test.go`
+(`SetFaultHook`); the tests still assert only observable results — bytes
+and permissions on disk, the returned error, the recovery artefacts —
+against real files in a temporary Vault. The mutation matrix of the
+persistence contract lives here, at this seam; e2e scenarios keep proving
+the integration and the semantic differences between the commands.
+
 ## Targets
 
 ```sh

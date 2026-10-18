@@ -50,32 +50,16 @@ func (s Store) Edit(id string, edit func(path string) error) error {
 }
 
 // Create allocates a fresh ID for prefix, renders i and writes it as a
-// new file. Every *.md entry that is not a directory counts as
-// occupied — symlinks included — so a new Issue never takes a name the
-// Vault already uses and never writes through a link; O_CREATE|O_EXCL
-// plus O_NOFOLLOW on the open is the belt to that suspenders. The
-// caller supplies the randomness (rng) and the prefix (from the Vault
-// config it already loaded).
+// new file. It is a RankPlan with no Rank change: the same operation as
+// every other write, so a failed creation leaves no file behind. Every
+// *.md entry that is not a directory counts as occupied — symlinks
+// included — so a new Issue never takes a name the Vault already uses
+// and never writes through a link; O_CREATE|O_EXCL plus O_NOFOLLOW on
+// the open is the belt to that suspenders. The caller supplies the
+// randomness (rng) and the prefix (from the Vault config it already
+// loaded).
 func (s Store) Create(prefix string, i issue.Issue, rng io.Reader) (string, error) {
-	taken, err := s.takenIDs()
-	if err != nil {
-		return "", err
-	}
-	id, err := issue.NextID(prefix, taken, rng)
-	if err != nil {
-		return "", err
-	}
-	if err := checkID(id); err != nil {
-		return "", err
-	}
-	data, err := issue.Render(i)
-	if err != nil {
-		return "", err
-	}
-	if err := s.createBytes(id, data); err != nil {
-		return "", err
-	}
-	return id, nil
+	return s.ApplyRankPlan(RankPlan{Create: &NewIssue{Prefix: prefix, Issue: i, Rand: rng}})
 }
 
 // takenIDs maps every Issue ID that Create must not reuse: every *.md
@@ -124,19 +108,20 @@ func (s Store) writeBytes(id string, data []byte) error {
 // createBytes writes a brand-new Issue file. O_EXCL never truncates an
 // existing file and never follows a symlink, so the worst case of a
 // name slipped in after the scan is a loud failure, not a write outside
-// the Vault.
-func (s Store) createBytes(id string, data []byte) error {
+// the Vault. created reports whether this call made the file: only then
+// may a rollback remove it, never an entry that was already there.
+func (s Store) createBytes(id string, data []byte) (created bool, err error) {
 	f, err := os.OpenFile(s.path(id), os.O_WRONLY|os.O_CREATE|os.O_EXCL|issueOpenNoFollow, 0o644)
 	if err != nil {
-		return fmt.Errorf("writing issue %s: %w", id, err)
+		return false, fmt.Errorf("writing issue %s: %w", id, err)
 	}
 	_, writeErr := f.Write(data)
 	closeErr := f.Close()
 	if writeErr != nil {
-		return fmt.Errorf("writing issue %s: %w", id, writeErr)
+		return true, fmt.Errorf("writing issue %s: %w", id, writeErr)
 	}
 	if closeErr != nil {
-		return fmt.Errorf("closing issue %s: %w", id, closeErr)
+		return true, fmt.Errorf("closing issue %s: %w", id, closeErr)
 	}
-	return nil
+	return true, nil
 }

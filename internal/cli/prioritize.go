@@ -6,6 +6,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -114,34 +115,23 @@ func writeBuffer(buffer string) (string, error) {
 	return path, nil
 }
 
-// applyRankChanges applies each rank change in-process, without spawning a
-// subprocess per issue.
+// applyRankChanges applies the whole planned set of Rank changes in-process,
+// as one recoverable operation of the store: the plan is prepared in full
+// before the first write, a failure after it is rolled back to the previous
+// bytes and permissions, and a restoration that does not complete is an
+// operational error naming the pending Issues and where their originals are
+// kept. Every rank command funnels through it — mt prioritize, mt check
+// --fix, the quick-order commands (rank/top/bottom/unrank), mt place and
+// create/q's --top/--bottom — so the recovery contract cannot be forgotten
+// in one of them. A missing Issue (a Vault that changed underneath the
+// command) produces the same not-found error the rank paths always produced.
 func applyRankChanges(vaultDir string, changes []issue.Change) error {
-	for _, ch := range changes {
-		if err := writeRank(vaultDir, ch.ID, ch.Rank); err != nil {
-			return err
-		}
+	_, err := issuefiles.Open(vaultDir).ApplyRankPlan(issuefiles.RankPlan{Changes: changes})
+	var missing *issuefiles.MissingIssueError
+	if errors.As(err, &missing) {
+		return vaultTarget{dir: vaultDir}.mapNotFound(missing, missing.ID)
 	}
-	return nil
-}
-
-// writeRank is the single Rank write path of the CLI: it validates the ID —
-// a malformed ID is a usage error (exit 2), never a write outside the Vault —
-// and persists rank (nil = Backlog) through the store's Mutate door,
-// preserving every other field. mt prioritize, mt check --fix, the quick-order
-// commands (rank/top/bottom/unrank), mt place and create/q's --top/--bottom
-// all funnel through it, so the ID validation cannot be forgotten in one of
-// them. A missing Issue produces the same not-found error the rank paths
-// always produced.
-func writeRank(vaultDir, id string, rank *int) error {
-	if err := checkID(id); err != nil {
-		return err
-	}
-	_, err := issuefiles.Open(vaultDir).Mutate(id, func(i issue.Issue) (issue.Issue, error) {
-		i.Frontmatter.Rank = rank
-		return i, nil
-	})
-	return vaultTarget{dir: vaultDir}.mapNotFound(err, id)
+	return err
 }
 
 const prioritizeLong = `prioritize opens $EDITOR on a buffer of the vault's open and in_progress

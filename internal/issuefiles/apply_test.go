@@ -1,8 +1,7 @@
 // The recoverable application of a RankPlan, black-box tested against
-// t.TempDir() vaults. The fault seam (export_test.go) forces failures at
-// the package's own stages; every assertion is on observable results:
-// bytes and permissions on disk, the returned error, and the recovery
-// artefacts left behind.
+// t.TempDir() vaults with the fault seam (export_test.go). Every
+// assertion is on observable results: bytes, permissions, error,
+// artefacts.
 package issuefiles_test
 
 import (
@@ -35,8 +34,7 @@ func withRank(i issue.Issue, rank int) issue.Issue {
 	return i
 }
 
-// rankedItem returns the Change that sets id's Rank to rank (nil for the
-// Backlog).
+// rankedItem returns the Change that sets id's Rank to rank (nil = Backlog).
 func rankedItem(id string, rank int) issue.Change {
 	r := rank
 	return issue.Change{ID: id, Rank: &r}
@@ -85,8 +83,7 @@ func assertNoRecoveryArtifacts(t *testing.T, dir string) {
 	}
 }
 
-// hookAt returns a fault hook that fails exactly once at stage/id with
-// boom, and a function reporting whether it fired.
+// hookAt returns a hook that fails once at stage/id, and a fired probe.
 func hookAt(stage issuefiles.FaultStage, id string, boom error) (func(issuefiles.FaultStage, string) error, func() bool) {
 	fired := false
 	hook := func(s issuefiles.FaultStage, i string) error {
@@ -99,9 +96,7 @@ func hookAt(stage issuefiles.FaultStage, id string, boom error) (func(issuefiles
 	return hook, func() bool { return fired }
 }
 
-// TestApplyRankPlanAppliesTheWholePlan is the happy path: every change
-// lands, the returned ID names the created Issue, unchanged Issues are
-// not rewritten and no recovery artefact remains.
+// TestApplyRankPlanAppliesTheWholePlan: the happy path.
 func TestApplyRankPlanAppliesTheWholePlan(t *testing.T) {
 	dir := newVault(t)
 	a := rankedIssue("a", 1)
@@ -133,9 +128,8 @@ func TestApplyRankPlanAppliesTheWholePlan(t *testing.T) {
 	assertNoRecoveryArtifacts(t, dir)
 }
 
-// TestApplyRankPlanPreparationFailureWritesNothing: a plan whose later
-// target is missing (or non-regular) leaves every earlier Issue
-// untouched and creates no recovery artefact.
+// TestApplyRankPlanPreparationFailureWritesNothing: a later invalid,
+// missing or non-regular target leaves every earlier Issue untouched.
 func TestApplyRankPlanPreparationFailureWritesNothing(t *testing.T) {
 	for name, target := range map[string]func(t *testing.T, dir string){
 		"missing": func(t *testing.T, dir string) {
@@ -166,8 +160,7 @@ func TestApplyRankPlanPreparationFailureWritesNothing(t *testing.T) {
 }
 
 // TestApplyRankPlanPreparationFailureIsTyped: a missing target is a
-// MissingIssueError that still wraps os.ErrNotExist, so the command
-// layer keeps rendering its not-found message.
+// MissingIssueError that still wraps os.ErrNotExist.
 func TestApplyRankPlanPreparationFailureIsTyped(t *testing.T) {
 	dir := newVault(t)
 	_, err := issuefiles.Open(dir).ApplyRankPlan(issuefiles.RankPlan{
@@ -186,9 +179,8 @@ func TestApplyRankPlanPreparationFailureIsTyped(t *testing.T) {
 }
 
 // TestApplyRankPlanRestoresAfterAFailedWrite: a failure after a
-// successful write restores every attempted Issue to its original bytes
-// and permissions — the Issue whose write failed included — and leaves
-// no recovery artefact.
+// successful write restores every attempted Issue — the failed one
+// included — to its original bytes and permissions.
 func TestApplyRankPlanRestoresAfterAFailedWrite(t *testing.T) {
 	for name, stage := range map[string]issuefiles.FaultStage{
 		"failure before the write of pkm-bbb": issuefiles.StageBeforeWrite,
@@ -235,9 +227,8 @@ func TestApplyRankPlanRestoresAfterAFailedWrite(t *testing.T) {
 	}
 }
 
-// TestApplyRankPlanRestoresASwappedPair: the Rank 1/2 exchange fails at
-// the second write — the disk holds an intermediate state, and the
-// operation may not call it recovered until both Issues are back.
+// TestApplyRankPlanRestoresASwappedPair: the 1/2 exchange fails at the
+// second write and is not called recovered until both are back.
 func TestApplyRankPlanRestoresASwappedPair(t *testing.T) {
 	dir := newVault(t)
 	a, b := rankedIssue("a", 1), rankedIssue("b", 2)
@@ -245,8 +236,8 @@ func TestApplyRankPlanRestoresASwappedPair(t *testing.T) {
 	writeIssue(t, dir, "pkm-bbb", b)
 	boom := errors.New("second write fails")
 
-	// Swap: a→2, b→1. The hook fails the second write after pkm-aaa was
-	// already rewritten, so the disk briefly holds ranks 2 and 2.
+	// Swap: a→2, b→1. The hook fails the second write, so the disk
+	// briefly holds ranks 2 and 2.
 	hook, fired := hookAt(issuefiles.StageAfterWrite, "pkm-bbb", boom)
 	cleanup := issuefiles.SetFaultHook(hook)
 	defer cleanup()
@@ -273,7 +264,7 @@ func TestApplyRankPlanRestoresASwappedPair(t *testing.T) {
 }
 
 // TestApplyRankPlanRestoresReadOnlyPermissions: a restoration brings
-// back the original permission bits, including a read-only Issue.
+// back the original permission bits, read-only included.
 func TestApplyRankPlanRestoresReadOnlyPermissions(t *testing.T) {
 	dir := newVault(t)
 	a, b := rankedIssue("a", 1), rankedIssue("b", 2)
@@ -284,9 +275,8 @@ func TestApplyRankPlanRestoresReadOnlyPermissions(t *testing.T) {
 	}
 	boom := errors.New("write fails after the first")
 
-	// The second change fails after its write, so the restoration has to
-	// write the read-only pkm-aaa back — it opens it for the owner's
-	// write access only for the restoration and sets the mode back.
+	// The second change fails after its write, so the restoration has
+	// to write the read-only pkm-aaa back.
 	hook, fired := hookAt(issuefiles.StageAfterWrite, "pkm-bbb", boom)
 	cleanup := issuefiles.SetFaultHook(hook)
 	defer cleanup()
@@ -310,8 +300,7 @@ func TestApplyRankPlanRestoresReadOnlyPermissions(t *testing.T) {
 }
 
 // TestApplyRankPlanWithoutChangesLeavesNoArtifacts: a plan whose every
-// change is already in place writes nothing and creates no recovery
-// directory at all.
+// change is already in place writes nothing.
 func TestApplyRankPlanWithoutChangesLeavesNoArtifacts(t *testing.T) {
 	dir := newVault(t)
 	a := rankedIssue("a", 1)
@@ -328,8 +317,8 @@ func TestApplyRankPlanWithoutChangesLeavesNoArtifacts(t *testing.T) {
 	assertNoRecoveryArtifacts(t, dir)
 }
 
-// TestApplyRankPlanKeepsFieldsThatAreNotRank: the planned write renders
-// the whole Issue — body and every frontmatter field survive.
+// TestApplyRankPlanKeepsFieldsThatAreNotRank: body and frontmatter
+// fields survive.
 func TestApplyRankPlanKeepsFieldsThatAreNotRank(t *testing.T) {
 	dir := newVault(t)
 	writeIssue(t, dir, "pkm-aaa", "---\ntitle: a\nstatus: open\nlabels: [x, y]\ncreated_at: 2026-01-01T10:00\nblocked_by: [pkm-bbb]\nrank: 2\n---\n\n## Description\n\nbody line\n\n## Notes\n## Comments\n")
@@ -350,10 +339,10 @@ func TestApplyRankPlanKeepsFieldsThatAreNotRank(t *testing.T) {
 	}
 }
 
-// TestApplyRankPlanKeepsTheOriginalWhenTheRestorationIsIncomplete: one
-// Issue cannot be restored — the error names it and the absolute path of
-// its original, the others are restored, and the original kept on disk
-// carries the original bytes and permissions.
+// TestApplyRankPlanKeepsTheOriginalWhenTheRestorationIsIncomplete: the
+// pending Issue is named with the absolute path of its original, the
+// others are restored, and the kept original holds the original bytes
+// and permissions.
 func TestApplyRankPlanKeepsTheOriginalWhenTheRestorationIsIncomplete(t *testing.T) {
 	dir := newVault(t)
 	a, b := rankedIssue("a", 1), rankedIssue("b", 2)
@@ -365,7 +354,7 @@ func TestApplyRankPlanKeepsTheOriginalWhenTheRestorationIsIncomplete(t *testing.
 	aPerm := readPerm(t, issuePath(dir, "pkm-aaa"))
 	boom := errors.New("write fails")
 
-	// The operation fails after pkm-bbb was written, then the hook also
+	// The operation fails after pkm-bbb was written, and the hook also
 	// refuses pkm-aaa's restoration: the recovery stays incomplete.
 	var calls int
 	hook := func(stage issuefiles.FaultStage, id string) error {
@@ -402,8 +391,8 @@ func TestApplyRankPlanKeepsTheOriginalWhenTheRestorationIsIncomplete(t *testing.
 	if got := readIssueFile(t, dir, "pkm-bbb"); got != b {
 		t.Errorf("pkm-bbb after the incomplete recovery = %q, want its original bytes", got)
 	}
-	// The original of the pending Issue is kept beside the Vault, with
-	// its bytes and permissions, outside the Issue listing.
+	// The pending Issue's original is kept beside the Vault, bytes and
+	// permissions intact, outside the Issue listing.
 	original := recovery.Pending[0].Original
 	if !filepath.IsAbs(original) {
 		t.Errorf("Pending original path %q is not absolute", original)
@@ -426,17 +415,15 @@ func TestApplyRankPlanKeepsTheOriginalWhenTheRestorationIsIncomplete(t *testing.
 			t.Errorf("the recovery area leaked into the Issue listing: %v", ids(items))
 		}
 	}
-	// A recovery that was incomplete keeps the originals: nothing is
-	// removed automatically afterwards.
+	// An incomplete recovery keeps its originals on disk.
 	ops := recoveryOps(t, dir)
 	if len(ops) != 1 {
 		t.Errorf("recovery operations on disk = %v, want the pending one kept", ops)
 	}
 }
 
-// TestApplyRankPlanCreatesJointly: the shifts and the newcomer are one
-// operation — the shifts land, the newcomer is created with its rank,
-// and no recovery artefact remains.
+// TestApplyRankPlanCreatesJointly: shifts and newcomer are one
+// operation.
 func TestApplyRankPlanCreatesJointly(t *testing.T) {
 	dir := newVault(t)
 	writeIssue(t, dir, "pkm-aaa", rankedIssue("a", 1))
@@ -466,8 +453,7 @@ func TestApplyRankPlanCreatesJointly(t *testing.T) {
 }
 
 // TestApplyRankPlanCreateFailureRestoresTheNeighbors: a failure after
-// the shifts were written restores them and removes the Issue this
-// operation created.
+// the shifts were written restores them and removes the created Issue.
 func TestApplyRankPlanCreateFailureRestoresTheNeighbors(t *testing.T) {
 	dir := newVault(t)
 	a := rankedIssue("a", 1)
@@ -498,9 +484,9 @@ func TestApplyRankPlanCreateFailureRestoresTheNeighbors(t *testing.T) {
 	assertNoRecoveryArtifacts(t, dir)
 }
 
-// TestApplyRankPlanCreateFailureRemovesOnlyTheCreatedIssue: when the
-// created Issue could not be removed, the error reports the pending
-// removal — never a pending restoration, because there was no original.
+// TestApplyRankPlanCreateFailureRemovesOnlyTheCreatedIssue: a created
+// Issue that cannot be removed is a pending removal, never a pending
+// restoration — there was no original.
 func TestApplyRankPlanCreateFailureRemovesOnlyTheCreatedIssue(t *testing.T) {
 	dir := newVault(t)
 	a, b := rankedIssue("a", 1), rankedIssue("b", 2)
@@ -509,10 +495,9 @@ func TestApplyRankPlanCreateFailureRemovesOnlyTheCreatedIssue(t *testing.T) {
 	boom := errors.New("write fails")
 	createdIssueChmodded := false
 
-	// The hook fails the operation right after the creation landed, and
-	// then makes issues/ read-only before the restores: the writes come
-	// back (a write into an existing file needs no directory write), but
-	// the removal of the created Issue fails — issues/ refuses it.
+	// The hook fails the operation right after the creation landed and
+	// makes issues/ read-only on the way: the restores come back, the
+	// removal of the created Issue does not.
 	hook := func(stage issuefiles.FaultStage, id string) error {
 		switch {
 		case stage == issuefiles.StageCreated && strings.HasPrefix(id, "pkm-0"):
@@ -560,9 +545,9 @@ func TestApplyRankPlanCreateFailureRemovesOnlyTheCreatedIssue(t *testing.T) {
 	}
 }
 
-// TestApplyRankPlanNeverRemovesAPreexistingEntry: a name that slipped in
-// between the scan and the open fails the creation, and the rollback
-// must leave that entry alone — it was never this operation's.
+// TestApplyRankPlanNeverRemovesAPreexistingEntry: an entry planted at
+// the target name between the scan and the open is never removed by the
+// rollback — it was never this operation's.
 func TestApplyRankPlanNeverRemovesAPreexistingEntry(t *testing.T) {
 	dir := newVault(t)
 	a := rankedIssue("a", 1)
@@ -571,8 +556,7 @@ func TestApplyRankPlanNeverRemovesAPreexistingEntry(t *testing.T) {
 	boom := errors.New("open fails")
 
 	// The hook plants the occupant at the ID the plan is about to
-	// create — the name the scan could not have seen — and fails the
-	// open, as an EEXIST would.
+	// create, and fails the open, as an EEXIST would.
 	hook := func(stage issuefiles.FaultStage, id string) error {
 		if stage == issuefiles.StageBeforeCreate {
 			if err := os.WriteFile(issuePath(dir, id), []byte(occupied), 0o644); err != nil {
@@ -613,8 +597,7 @@ func TestApplyRankPlanNeverRemovesAPreexistingEntry(t *testing.T) {
 }
 
 // TestApplyRankPlanReportsACleanupFailure: an applied operation whose
-// recovery directory cannot be removed is an error that says so — the
-// directory stays and the success is not hidden.
+// recovery directory cannot be removed reports it; the directory stays.
 func TestApplyRankPlanReportsACleanupFailure(t *testing.T) {
 	dir := newVault(t)
 	writeIssue(t, dir, "pkm-aaa", rankedIssue("a", 1))
@@ -650,8 +633,7 @@ func TestApplyRankPlanReportsACleanupFailure(t *testing.T) {
 }
 
 // TestApplyRankPlanRejectsAMalformedOrDuplicatedTarget: the preparation
-// refuses a plan that names an ID that cannot exist or names one Issue
-// twice — before any write and without artefacts.
+// refuses a malformed or twice-planned ID before any write.
 func TestApplyRankPlanRejectsAMalformedOrDuplicatedTarget(t *testing.T) {
 	for name, changes := range map[string][]issue.Change{
 		"malformed ID": {{ID: "../escape", Rank: nil}},
@@ -673,8 +655,8 @@ func TestApplyRankPlanRejectsAMalformedOrDuplicatedTarget(t *testing.T) {
 	}
 }
 
-// TestApplyRankPlanPreparationFailureNamesTheCause: a preparation failure
-// says which Issue it was preparing and why, before anything is written.
+// TestApplyRankPlanPreparationFailureNamesTheCause: a preparation
+// failure names the Issue it was preparing.
 func TestApplyRankPlanPreparationFailureNamesTheCause(t *testing.T) {
 	dir := newVault(t)
 	writeIssue(t, dir, "pkm-aaa", rankedIssue("a", 1))
@@ -701,7 +683,7 @@ func TestApplyRankPlanPreparationFailureNamesTheCause(t *testing.T) {
 }
 
 // TestApplyRankPlanPreparationFailureNamesTheMissingIssue: the typed
-// error renders the target the plan could not find.
+// error names the target the plan could not find.
 func TestApplyRankPlanPreparationFailureNamesTheMissingIssue(t *testing.T) {
 	dir := newVault(t)
 	_, err := issuefiles.Open(dir).ApplyRankPlan(issuefiles.RankPlan{
@@ -716,8 +698,8 @@ func TestApplyRankPlanPreparationFailureNamesTheMissingIssue(t *testing.T) {
 	}
 }
 
-// TestApplyRankPlanRefusesACreationThatCannotBeNamed: the creation's
-// randomness failing is a preparation failure — nothing is written.
+// TestApplyRankPlanRefusesACreationThatCannotBeNamed: failing
+// randomness is a preparation failure — nothing is written.
 func TestApplyRankPlanRefusesACreationThatCannotBeNamed(t *testing.T) {
 	dir := newVault(t)
 	before := rankedIssue("a", 1)
@@ -741,9 +723,8 @@ func (failingReader) Read(p []byte) (int, error) {
 	return 0, errors.New("no randomness")
 }
 
-// TestApplyRankPlanRefusesARecoveryPathThatIsNotADirectory: an entry
-// planted at .mt-recovery — a file or a symlink — refuses the operation
-// before any Issue is written; the link is never followed.
+// TestApplyRankPlanRefusesARecoveryPathThatIsNotADirectory: a file or
+// symlink planted at .mt-recovery refuses the operation; never followed.
 func TestApplyRankPlanRefusesARecoveryPathThatIsNotADirectory(t *testing.T) {
 	for name, plant := range map[string]func(t *testing.T, dir string){
 		"file": func(t *testing.T, dir string) {
@@ -774,8 +755,8 @@ func TestApplyRankPlanRefusesARecoveryPathThatIsNotADirectory(t *testing.T) {
 	}
 }
 
-// TestApplyRankPlanReportsAnUnwritableRecoveryArea: a recovery area the
-// process cannot write fails the preparation — no Issue is touched.
+// TestApplyRankPlanReportsAnUnwritableRecoveryArea: an unwritable
+// recovery area fails the preparation — no Issue is touched.
 func TestApplyRankPlanReportsAnUnwritableRecoveryArea(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("permissions do not stop root")
@@ -799,10 +780,8 @@ func TestApplyRankPlanReportsAnUnwritableRecoveryArea(t *testing.T) {
 	}
 }
 
-// TestApplyRankPlanSiblingsKeepTheirOriginals: an operation that ends
-// with pending originals leaves them in place, and a later operation of
-// the same Vault removes only its own directory — the pending one stays,
-// untouched, for the manual recovery.
+// TestApplyRankPlanSiblingsKeepTheirOriginals: a later operation removes
+// only its own recovery directory — the pending one stays untouched.
 func TestApplyRankPlanSiblingsKeepTheirOriginals(t *testing.T) {
 	dir := newVault(t)
 	a, b, c := rankedIssue("a", 1), rankedIssue("b", 2), backlogIssue("c")
@@ -811,8 +790,8 @@ func TestApplyRankPlanSiblingsKeepTheirOriginals(t *testing.T) {
 	writeIssue(t, dir, "pkm-ccc", c)
 	boom := errors.New("write fails")
 
-	// Operation 1: fails, and its restoration of pkm-aaa also fails —
-	// its original stays in .mt-recovery.
+	// Operation 1 fails, and its restoration of pkm-aaa too: its
+	// original stays in .mt-recovery.
 	hook := func(stage issuefiles.FaultStage, id string) error {
 		switch {
 		case stage == issuefiles.StageAfterWrite && id == "pkm-bbb":
@@ -838,8 +817,8 @@ func TestApplyRankPlanSiblingsKeepTheirOriginals(t *testing.T) {
 	}
 	pendingDir := filepath.Join(recoveryRoot(dir), kept[0].Name())
 
-	// Operation 2: fails before its write, restores cleanly — and its
-	// cleanup leaves operation 1's pending originals alone.
+	// Operation 2 fails before its write and restores cleanly, leaving
+	// operation 1's pending originals alone.
 	hook2, fired := hookAt(issuefiles.StageBeforeWrite, "pkm-ccc", boom)
 	cleanup2 := issuefiles.SetFaultHook(hook2)
 	defer cleanup2()
@@ -870,9 +849,8 @@ func TestApplyRankPlanSiblingsKeepTheirOriginals(t *testing.T) {
 	}
 }
 
-// TestApplyRankPlanMessagesDescribeTheState: the errors say what the
-// user has on disk — restored, pending, or applied-with-artefacts — and
-// never claim success over a state the Vault does not hold.
+// TestApplyRankPlanMessagesDescribeTheState: the errors describe the
+// state actually on disk and never claim success over it.
 func TestApplyRankPlanMessagesDescribeTheState(t *testing.T) {
 	t.Run("complete restoration", func(t *testing.T) {
 		dir := newVault(t)
@@ -920,9 +898,9 @@ func TestApplyRankPlanMessagesDescribeTheState(t *testing.T) {
 		dir := newVault(t)
 		writeIssue(t, dir, "pkm-aaa", rankedIssue("a", 1))
 		// The hook fails the operation right after the creation landed,
-		// making issues/ read-only on the way: the removal of the created
-		// Issue is then refused, and the recovery stays incomplete with a
-		// pending removal — not a pending restoration.
+		// making issues/ read-only on the way: the removal is then
+		// refused, and the recovery stays incomplete with a pending
+		// removal — not a pending restoration.
 		hook := func(stage issuefiles.FaultStage, id string) error {
 			if stage == issuefiles.StageCreated && strings.HasPrefix(id, "pkm-0") {
 				if err := os.Chmod(filepath.Join(dir, "issues"), 0o555); err != nil {

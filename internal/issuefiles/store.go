@@ -1,10 +1,7 @@
 // Package issuefiles is the single owner of the Issue files of a Vault:
 // listing, reading, writing, editing and creating them, and applying a
-// planned set of Rank changes as one recoverable operation (ApplyRankPlan:
-// prepare in full, keep the originals in <Vault>/.mt-recovery/<op>/, roll
-// back what was attempted on failure, report an incomplete restoration
-// with the pending Issues and the absolute path of their originals — see
-// docs/adr/0011-rank-application-is-recoverable.md). It is Seam 2 —
+// planned set of Rank changes as one recoverable operation (ApplyRankPlan,
+// see docs/adr/0011-rank-application-is-recoverable.md). It is Seam 2 —
 // pure logic, black-box tested against t.TempDir() vaults, with the
 // coverage and mutation gates.
 //
@@ -198,8 +195,8 @@ func (s Store) checkRegular(id string) error {
 	return err
 }
 
-// regularPerm is checkRegular that also reports the permission bits of
-// the file — the part of its mode a restoration brings back.
+// regularPerm is checkRegular that also reports the file's permission
+// bits — the part of its mode a restoration brings back.
 func (s Store) regularPerm(id string) (fs.FileMode, error) {
 	info, err := os.Lstat(s.path(id))
 	if err != nil {
